@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "name": "memory-search",
+  "slug": "memory-search",
+  "version": "1.0.0",
+  "title": "Memory Search",
+  "description": "Search relevant long-term memories for the current user and active persona.",
+  "tools": [
+    {
+      "name": "memory-search",
+      "description": "Search relevant memories by query and return structured matches.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The user question or recall query."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "default": 4
+          }
+        },
+        "required": ["query"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array"
+          }
+        }
+      }
+    }
+  ],
+  "permissions": ["memory:read"],
+  "triggers": ["remember", "what do I prefer", "recall", "earlier context", "response style"]
+}

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personal-agent-api"
+version = "0.1.0"
+description = "FastAPI backend for the personal agent platform MVP."
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.14.1",
+  "fastapi>=0.115.6",
+  "httpx>=0.28.1",
+  "openpyxl>=3.1.5",
+  "pydantic>=2.10.6",
+  "pydantic-settings>=2.7.1",
+  "psycopg[binary]>=3.2.3",
+  "python-multipart>=0.0.20",
+  "qdrant-client>=1.13.2",
+  "redis>=5.2.1",
+  "sqlalchemy>=2.0.37",
+  "uvicorn[standard]>=0.34.0"
+]
+
+[project.optional-dependencies]
+local-training = [
+  "accelerate>=1.4.0",
+  "peft>=0.14.0",
+  "torch>=2.5.1",
+  "transformers>=4.48.3"
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

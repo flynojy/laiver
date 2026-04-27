@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "name": "task-extractor",
+  "slug": "task-extractor",
+  "version": "1.0.0",
+  "title": "Task Extractor",
+  "description": "Extract actionable tasks from the user's message and return structured action items.",
+  "tools": [
+    {
+      "name": "task-extractor",
+      "description": "Extract task candidates with title, summary, and priority.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The user message that may contain action items."
+          }
+        },
+        "required": ["text"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array"
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  ],
+  "permissions": ["message:read"],
+  "triggers": ["todo", "action item", "next step", "need to", "follow up"]
+}

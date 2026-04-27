@@ -1,0 +1,23 @@
+{
+  "name": "personal-agent-platform",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @agent/web",
+    "build:web": "npm run build --workspace @agent/web",
+    "lint:web": "npm run lint --workspace @agent/web",
+    "typecheck:web": "npm run typecheck --workspace @agent/web",
+    "windows:doctor": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Invoke-AgentDoctor.ps1",
+    "windows:infra:up": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Start-AgentInfra.ps1",
+    "windows:infra:down": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Stop-AgentInfra.ps1",
+    "windows:db:migrate": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Invoke-AgentMigrate.ps1",
+    "windows:dev:api": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Start-AgentApi.ps1",
+    "windows:dev:web": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Start-AgentWeb.ps1",
+    "windows:deepseek:check": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Invoke-DeepSeekLiveCheck.ps1",
+    "windows:tunnel": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Start-AgentTunnel.ps1"
+  }
+}

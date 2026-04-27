@@ -1,0 +1,4 @@
+[2026-03-18T10:00:00] Robin: I prefer detailed explanations with context, trade-offs, and implementation notes.
+[2026-03-18T10:00:22] Robin: When we discuss product decisions, compare options explicitly before recommending one.
+[2026-03-18T10:01:03] Robin: I usually work on research workflows, knowledge systems, and long-form writing.
+[2026-03-18T10:01:34] Robin: Keep the tone reflective and analytical rather than fast and terse.

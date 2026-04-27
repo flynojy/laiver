@@ -1,0 +1,7 @@
+[2026-03-18T09:00:00] Morgan: I like concise answers. Lead with the conclusion first, then give 2 or 3 practical bullets.
+[2026-03-18T09:00:18] Assistant: Understood. I will keep answers concise and structured.
+[2026-03-18T09:01:00] Morgan: I usually work on agent products, onboarding flows, and MVP validation.
+[2026-03-18T09:01:26] Morgan: Please remember that I prefer practical steps over theory.
+[2026-03-18T09:01:50] Assistant: Got it. I will prioritize practical steps and lightweight fixes.
+[2026-03-18T09:02:30] Morgan: When we discuss bugs, start with the root cause and then the fastest fix.
+[2026-03-18T09:03:10] Morgan: Thanks. Keep the tone collaborative and calm.
