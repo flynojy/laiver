@@ -21,9 +21,9 @@ from app.services.conversation_summary_service import (
     apply_compression_to_conversation,
     build_conversation_compression,
 )
+from app.services.memory.routing import classify_memory_query
 from app.services.memory_service import (
     build_memory_profile,
-    classify_memory_query,
     infer_memory_profile,
     search_memories,
     write_memory,

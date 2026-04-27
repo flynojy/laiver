@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-import math
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from qdrant_client import QdrantClient
-from qdrant_client.http import models as qdrant_models
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -23,87 +20,25 @@ from app.models.relationship_state import RelationshipState
 from app.models.user_profile import UserProfile
 from app.models.user import User
 from app.schemas.memory import MemoryCreate, MemoryDebugResponse, MemoryUpdate
+from app.services.memory.policy import (
+    DECAY_POLICY_GRACE_DAYS,
+    DECAY_POLICY_RATES,
+    FACT_ARCHIVE_IMPORTANCE_THRESHOLD,
+    FACT_ARCHIVE_STABILITY_THRESHOLD,
+    FACT_AUTO_COMMIT_MIN_CONFIDENCE,
+    FACT_AUTO_COMMIT_MIN_IMPORTANCE,
+    REVIEW_REQUIRED_SENSITIVITY,
+    STALE_CANDIDATE_DAYS,
+)
+from app.services.memory.routing import classify_memory_query
+from app.services.memory.serialization import (
+    serialize_relationship_state,
+    serialize_user_profile,
+)
+from app.services.memory.vector_index import LocalHashEmbeddingProvider, QdrantMemoryIndex
 from app.utils.text import normalize_whitespace, tokenize
 
 settings = get_settings()
-
-
-class LocalHashEmbeddingProvider:
-    def __init__(self, size: int) -> None:
-        self.size = size
-
-    def embed(self, text: str) -> list[float]:
-        vector = [0.0] * self.size
-        for token in tokenize(text):
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            index = digest[0] % self.size
-            sign = 1.0 if digest[1] % 2 == 0 else -1.0
-            weight = 1.0 + (digest[2] / 255.0)
-            vector[index] += sign * weight
-        norm = math.sqrt(sum(item * item for item in vector)) or 1.0
-        return [item / norm for item in vector]
-
-
-class QdrantMemoryIndex:
-    def __init__(self) -> None:
-        self.client = QdrantClient(url=settings.qdrant_url, check_compatibility=False)
-        self.collection_name = settings.qdrant_collection
-        self.vector_size = settings.memory_vector_size
-
-    def ensure_collection(self) -> bool:
-        try:
-            collections = self.client.get_collections().collections
-            if not any(item.name == self.collection_name for item in collections):
-                self.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=qdrant_models.VectorParams(
-                        size=self.vector_size,
-                        distance=qdrant_models.Distance.COSINE,
-                    ),
-                )
-            return True
-        except Exception:
-            return False
-
-    def upsert(self, memory_id: str, vector: list[float], payload: dict) -> bool:
-        if not self.ensure_collection():
-            return False
-        try:
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=[qdrant_models.PointStruct(id=memory_id, vector=vector, payload=payload)],
-            )
-            return True
-        except Exception:
-            return False
-
-    def search(self, vector: list[float], user_id: str, persona_id: str | None, limit: int) -> list[str]:
-        if not self.ensure_collection():
-            return []
-
-        filters = [
-            qdrant_models.FieldCondition(
-                key="user_id",
-                match=qdrant_models.MatchValue(value=user_id),
-            )
-        ]
-        if persona_id:
-            filters.append(
-                qdrant_models.FieldCondition(
-                    key="persona_id",
-                    match=qdrant_models.MatchValue(value=persona_id),
-                )
-            )
-        try:
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=vector,
-                query_filter=qdrant_models.Filter(must=filters),
-                limit=limit,
-            )
-            return [str(item.id) for item in results]
-        except Exception:
-            return []
 
 
 embedding_provider = LocalHashEmbeddingProvider(settings.memory_vector_size)
@@ -136,66 +71,6 @@ FACT_KEY_STOPWORDS = {
     "keep",
     "tone",
 }
-
-MEMORY_ROUTE_HINTS = {
-    "profile": (
-        "prefer",
-        "preference",
-        "style",
-        "tone",
-        "what do i like",
-        "what style",
-        "how should you respond",
-        "response style",
-        "keep it practical",
-    ),
-    "instruction": (
-        "remember",
-        "always",
-        "must",
-        "should you",
-        "do not",
-        "don't",
-        "rule",
-        "instruction",
-        "from now on",
-    ),
-    "episodic": (
-        "last time",
-        "earlier",
-        "before",
-        "yesterday",
-        "today",
-        "when we",
-        "we discussed",
-        "what happened",
-        "previously",
-    ),
-}
-
-FACT_AUTO_COMMIT_MIN_IMPORTANCE = 0.75
-FACT_AUTO_COMMIT_MIN_CONFIDENCE = 0.72
-REVIEW_REQUIRED_SENSITIVITY = {"sensitive", "private", "high"}
-DECAY_POLICY_RATES = {
-    "session": 0.08,
-    "volatile": 0.05,
-    "default": 0.02,
-    "slow": 0.01,
-    "stable": 0.005,
-    "permanent": 0.0,
-}
-DECAY_POLICY_GRACE_DAYS = {
-    "session": 0,
-    "volatile": 3,
-    "default": 14,
-    "slow": 30,
-    "stable": 90,
-    "permanent": 36500,
-}
-FACT_ARCHIVE_STABILITY_THRESHOLD = 0.12
-FACT_ARCHIVE_IMPORTANCE_THRESHOLD = 0.2
-STALE_CANDIDATE_DAYS = 30
-
 
 def _normalized_content(content: str) -> str:
     lowered = normalize_whitespace(content).lower()
@@ -453,14 +328,6 @@ def _fact_strength(fact: MemoryFact) -> float:
     return round(strength, 4)
 
 
-def classify_memory_query(query: str) -> str:
-    lowered = normalize_whitespace(query).lower()
-    for route, markers in MEMORY_ROUTE_HINTS.items():
-        if any(marker in lowered for marker in markers):
-            return route
-    return "general"
-
-
 def _active_facts_for_profile(
     db: Session,
     *,
@@ -511,50 +378,6 @@ def _topic_candidates_from_memories(memories: list[Memory]) -> list[str]:
         if candidate and candidate not in topics:
             topics.append(candidate)
     return topics[:5]
-
-
-def _serialize_user_profile(profile: UserProfile | None) -> dict[str, Any]:
-    if profile is None:
-        return {}
-    return {
-        "id": str(profile.id),
-        "user_id": str(profile.user_id),
-        "core_identity": dict(profile.core_identity or {}),
-        "communication_style": dict(profile.communication_style or {}),
-        "stable_preferences": dict(profile.stable_preferences or {}),
-        "boundaries": dict(profile.boundaries or {}),
-        "life_context": dict(profile.life_context or {}),
-        "profile_summary": profile.profile_summary,
-        "profile_version": profile.profile_version,
-        "source_fact_count": profile.source_fact_count,
-        "last_rebuilt_at": profile.last_rebuilt_at.isoformat() if profile.last_rebuilt_at else None,
-        "confidence": profile.confidence,
-    }
-
-
-def _serialize_relationship_state(state: RelationshipState | None) -> dict[str, Any]:
-    if state is None:
-        return {}
-    return {
-        "id": str(state.id),
-        "user_id": str(state.user_id),
-        "persona_id": str(state.persona_id),
-        "relationship_stage": state.relationship_stage,
-        "warmth_score": state.warmth_score,
-        "trust_score": state.trust_score,
-        "familiarity_score": state.familiarity_score,
-        "preferred_tone": state.preferred_tone,
-        "active_topics": list(state.active_topics or []),
-        "recurring_rituals": list(state.recurring_rituals or []),
-        "recent_sensitivities": list(state.recent_sensitivities or []),
-        "unresolved_tensions": list(state.unresolved_tensions or []),
-        "last_meaningful_interaction_at": (
-            state.last_meaningful_interaction_at.isoformat() if state.last_meaningful_interaction_at else None
-        ),
-        "last_repair_at": state.last_repair_at.isoformat() if state.last_repair_at else None,
-        "summary": state.summary,
-        "version": state.version,
-    }
 
 
 def _memory_row_for_fact(db: Session, fact: MemoryFact) -> Memory | None:
@@ -1838,11 +1661,11 @@ def debug_memory_state(db: Session) -> MemoryDebugResponse:
             user_id=anchor_user_id,
             persona_id=anchor_persona_id,
         )
-        user_profile_snapshot = _serialize_user_profile(
+        user_profile_snapshot = serialize_user_profile(
             db.scalar(select(UserProfile).where(UserProfile.user_id == anchor_user_id))
         )
         if anchor_persona_id is not None:
-            relationship_state_snapshot = _serialize_relationship_state(
+            relationship_state_snapshot = serialize_relationship_state(
                 db.scalar(
                     select(RelationshipState).where(
                         RelationshipState.user_id == anchor_user_id,
