@@ -4,6 +4,8 @@
 
 本文档是后续修改、排期和 Agent 协作的项目基底。它基于当前仓库代码、README、`agent.md`、架构文档、ADR、Memory 计划文档、测试入口和一次本地验证尝试整理。除非有新的代码或测试结果覆盖，后续应以本文档作为当前状态判断。
 
+后续 Codex / Agent 接手提示词：先阅读本文档和 `agent.md`，复述当前阶段、已完成能力、剩余任务和本轮计划；完成任务后必须在本文档记录进度，并在最终回复说明接下来需要做的工作。
+
 ## 1. 项目定位
 
 Laiver 是一个面向个人长期陪伴场景的 personalized AI companion / personal agent 原型。
@@ -320,6 +322,10 @@ Training 链路当前支持：
 
 ## 7. 协作约定
 
+- 每次接手任务先做规划、理解和影响分析，再进行代码或文档修改。
+- 每次对话结束在最终回复中说明接下来需要做的工作。
+- 每次完成任务都在本文档追加或更新进度备注，便于对话中断后续接。
+- Codex / Agent 协作细则见 `agent.md`；接手新任务时必须同时阅读本文档和 `agent.md`。
 - 改后端行为前，先读 `apps/api/tests/test_integration.py`。
 - 改 API shape 时，通常需要同步：
   - `apps/api/app/schemas`
@@ -380,3 +386,12 @@ python scripts/run_mvp_regression.py
 - `docs/plans/2026-04-23-laiver-memory-system-implementation-plan.md`
 - `docs/plans/2026-04-23-memory-eval-matrix.md`
 - `apps/api/tests/test_integration.py`
+
+## 10. 进度备注
+
+### 2026-05-08：补充 Agent 续接协作规则
+
+- 当前阶段确认：项目处于 MVP+ / early alpha，核心链路已存在，最近完成 memory exact recall regression 并保持本地验证基线绿色记录。
+- 本轮完成：在 `agent.md` 增加接手前先规划理解分析、结束时说明下一步、完成后更新 `project.md` 的协作要求。
+- 本轮完成：在本文档增加 Codex / Agent 接手提示词，并把 `agent.md` 作为协作细则入口。
+- 下一步建议：按推荐近期路线继续推进 memory trace / provider health check 与 fallback policy；改动前先重新跑当前验证基线。
