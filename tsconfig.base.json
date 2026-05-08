@@ -17,7 +17,6 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".",
     "paths": {
       "@agent/shared": [
         "packages/shared/src/index.ts"
@@ -28,4 +27,3 @@
     }
   }
 }
-

@@ -95,19 +95,30 @@ scripts/
 从仓库根目录执行：
 
 ```powershell
+nvm use 22
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+npm.cmd ci
+python -m pip install -e "apps/api[dev]"
 npm.cmd run windows:doctor
 npm.cmd run windows:infra:up
 npm.cmd run windows:db:migrate
 npm.cmd run windows:dev:api
 npm.cmd run windows:dev:web
+npm.cmd run lint:api
+npm.cmd run test:api
+npm.cmd run eval:memory
+npm.cmd run typecheck:web
 npm.cmd run build:web
-python -m unittest discover -s apps/api/tests -p "test_*.py"
+npm.cmd run check
 python scripts/run_mvp_regression.py
 ```
 
 前端单独验证：
 
 ```powershell
+nvm use 22
+npm.cmd ci
 npm.cmd run typecheck:web
 npm.cmd run build:web
 ```

@@ -79,7 +79,7 @@ def list_connector_deliveries(db: Session, connector_id: str, limit: int = 20) -
     rows = db.scalars(
         select(ConnectorDelivery)
         .where(ConnectorDelivery.connector_id == uuid.UUID(connector_id))
-        .order_by(ConnectorDelivery.created_at.desc())
+        .order_by(ConnectorDelivery.updated_at.desc(), ConnectorDelivery.created_at.desc())
         .limit(limit)
     ).all()
     return [_build_delivery_read(row) for row in rows]
@@ -520,6 +520,7 @@ async def process_feishu_message(
     if connector.status != ConnectorStatus.ACTIVE and not test_mode:
         delivery.delivery_status = "inactive"
         delivery.error_message = "Connector is inactive."
+        delivery.updated_at = datetime.now(timezone.utc)
         trace = _build_connector_trace(
             trace_id=trace_id,
             normalized=normalized,
@@ -569,6 +570,7 @@ async def process_feishu_message(
     delivery.delivery_status = delivery_status
     delivery.error_message = error_message
     delivery.mode = mode
+    delivery.updated_at = datetime.now(timezone.utc)
 
     trace = _build_connector_trace(
         trace_id=trace_id,

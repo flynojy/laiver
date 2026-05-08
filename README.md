@@ -236,14 +236,23 @@ npm.cmd run windows:dev:web
 ## 常用命令
 
 ```powershell
+nvm use 22
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+npm.cmd ci
+python -m pip install -e "apps/api[dev]"
 npm.cmd run windows:doctor
 npm.cmd run windows:infra:up
 npm.cmd run windows:infra:down
 npm.cmd run windows:db:migrate
 npm.cmd run windows:dev:api
 npm.cmd run windows:dev:web
+npm.cmd run lint:api
+npm.cmd run test:api
+npm.cmd run eval:memory
+npm.cmd run typecheck:web
 npm.cmd run build:web
-python -m unittest discover -s apps/api/tests -p "test_*.py"
+npm.cmd run check
 python scripts/run_mvp_regression.py
 ```
 
@@ -276,4 +285,3 @@ python scripts/run_mvp_regression.py
 ## 项目定位
 
 Laiver 现在已经不是空壳 Demo，而是一个可以本地跑通核心闭环的 personalized agent 平台原型。它已经能导入聊天记录、生成 Persona、构建训练数据、接入模型、保留长期记忆、管理 Skills，并通过 Onboarding 把这些能力串成一条用户路径。
-

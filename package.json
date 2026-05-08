@@ -2,6 +2,10 @@
   "name": "personal-agent-platform",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10 <12"
+  },
   "workspaces": [
     "apps/web",
     "packages/shared"
@@ -11,6 +15,11 @@
     "build:web": "npm run build --workspace @agent/web",
     "lint:web": "npm run lint --workspace @agent/web",
     "typecheck:web": "npm run typecheck --workspace @agent/web",
+    "lint:api": "python -m ruff check apps/api --select E9,F63,F7,F82",
+    "format:api": "python -m ruff format apps/api",
+    "test:api": "python -m unittest discover -s apps/api/tests -p \"test_*.py\"",
+    "eval:memory": "python scripts/evals/run_memory_regression.py",
+    "check": "npm run lint:api && npm run test:api && npm run eval:memory && npm run typecheck:web && npm run build:web",
     "windows:doctor": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Invoke-AgentDoctor.ps1",
     "windows:infra:up": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Start-AgentInfra.ps1",
     "windows:infra:down": "powershell -ExecutionPolicy Bypass -File ./scripts/windows/Stop-AgentInfra.ps1",
