@@ -395,3 +395,10 @@ python scripts/run_mvp_regression.py
 - 本轮完成：在 `agent.md` 增加接手前先规划理解分析、结束时说明下一步、完成后更新 `project.md` 的协作要求。
 - 本轮完成：在本文档增加 Codex / Agent 接手提示词，并把 `agent.md` 作为协作细则入口。
 - 下一步建议：按推荐近期路线继续推进 memory trace / provider health check 与 fallback policy；改动前先重新跑当前验证基线。
+
+### 2026-05-08：提交协作规则并恢复验证基线
+
+- 本轮完成：提交 `Document agent handoff workflow`，提交号 `118f01f`。
+- 本轮验证：使用 `PATH=/opt/homebrew/opt/node@22/bin:.venv/bin:$PATH npm run check` 跑完整基线，通过 API lint、48 个后端集成测试、7 个 memory regression、Web typecheck 和 Web production build。
+- 环境备注：全局 Node 仍是 v25.9.0；验证时需要显式把 Node 22 和 `.venv/bin` 放到 PATH 前。
+- 下一步建议：开始 P1 任务，优先强化 provider health check / fallback policy / route policy，或继续扩展 memory trace 与 exact/full-text regression。
