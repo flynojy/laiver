@@ -748,6 +748,54 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertEqual(rows[0]["metadata"]["memory_label"], "episodic")
         self.assertIn("launch checklist", rows[0]["content"].lower())
 
+    def test_memory_search_prioritizes_exact_phrase_matches(self) -> None:
+        user_id, _, _, persona = create_full_state(self.client)
+        self.client.post(
+            "/api/v1/memories",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["persona"]["id"],
+                "memory_type": "episodic",
+                "content": "Alice asked me to send the release summary before Friday.",
+                "metadata": {
+                    "memory_label": "episodic",
+                    "source": "manual",
+                    "origin": "user_message",
+                },
+            },
+        ).raise_for_status()
+        self.client.post(
+            "/api/v1/memories",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["persona"]["id"],
+                "memory_type": "semantic",
+                "content": "I prefer concise answers with practical steps.",
+                "metadata": {
+                    "memory_label": "preference",
+                    "source": "manual",
+                    "origin": "user_message",
+                },
+            },
+        ).raise_for_status()
+
+        response = self.client.post(
+            "/api/v1/memories/search",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["persona"]["id"],
+                "query": "What did Alice ask about the release summary?",
+                "limit": 5,
+            },
+        )
+        response.raise_for_status()
+        rows = response.json()
+
+        self.assertTrue(rows)
+        self.assertEqual(rows[0]["metadata"]["memory_label"], "episodic")
+        self.assertIn("alice asked me", rows[0]["content"].lower())
+        self.assertIn("release summary", rows[0]["content"].lower())
+
     def test_memories_debug_endpoint(self) -> None:
         user_id, _, _, persona = create_full_state(self.client)
         self.client.post(

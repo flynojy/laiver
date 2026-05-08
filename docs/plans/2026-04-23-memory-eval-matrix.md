@@ -28,6 +28,7 @@ python scripts/evals/run_memory_regression.py --json
 | --- | --- | --- |
 | `profile_preference_recall` | 用户偏好类事实应优先被 profile / preference 路线召回 | 搜索结果非空；Top result 是 `preference`；内容包含 `concise answers` |
 | `episodic_recall` | “last time / 上次”类问题应优先召回 episodic memory | 搜索结果非空；Top result 是 `episodic`；内容包含 `launch checklist` |
+| `exact_phrase_recall` | 姓名、短语、原话片段应通过 exact / full-text 候选集被优先召回 | 搜索结果非空；Top result 是 `episodic`；内容包含 `Alice` 和 `release summary` |
 | `chat_grounding` | 第二轮对话应能利用第一轮写入的长期记忆 grounding 回复 | 第一轮写入 memory；第二轮使用 `memory-search`；回复和 memory hits 包含用户偏好 |
 | `duplicate_reinforcement` | 重复偏好写入应 reinforcement，而不是创建重复 fact | 两次写入返回同一 memory；reinforcement / duplicate count 为 2；profile 和 relationship snapshot 更新 |
 | `conflict_supersede` | 冲突 instruction 应 supersede 旧版本，并更新 profile | 旧 memory archived；新 memory active；profile 包含新 instruction 且不包含旧 instruction |
@@ -44,7 +45,7 @@ python scripts/evals/run_memory_regression.py --json
 
 下一批可补：
 
-- exact / full-text memory search：覆盖姓名、短语、专有名词和原话片段。
+- exact / full-text memory search：继续扩展中文姓名、专有名词和更长原话片段。
 - relationship continuity：多轮对话后 relationship state 的 warmth / familiarity / preferred tone 是否稳定更新。
 - maintenance effects：decay、archive、stale candidate ignore 之后是否影响 active recall。
 - privacy / sensitivity：敏感 memory 是否进入 gated flow，以及是否默认排除在普通 recall 外。

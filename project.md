@@ -226,7 +226,7 @@ Training 链路当前支持：
 - `.venv/bin/python -m ruff check apps/api --select E9,F63,F7,F82`
   - 结果：通过。
 - `.venv/bin/python -m unittest discover -s apps/api/tests -p 'test_*.py'`
-  - 结果：通过，47 个集成测试 OK。
+  - 结果：通过，48 个集成测试 OK。
 - `npm run typecheck:web`
   - 结果：通过，需使用 Node 22。
 - `npm run build:web`
@@ -234,7 +234,7 @@ Training 链路当前支持：
 - `npm run check`
   - 结果：通过。执行环境为项目 `.venv` 在 PATH 前、Node 22 在 PATH 前。
 - `npm run eval:memory`
-  - 结果：新增 Memory regression harness；需纳入后续验证。
+  - 结果：通过，7 个 regression eval OK，已覆盖 profile、episodic、exact phrase、chat grounding、duplicate、conflict 和 gated approval。
 
 因此当前状态是：**API 与 Web 的基础验证入口已恢复绿色；本机全局 Node 仍是 v25.9.0，执行前端命令时需要先切换到 Node 22**。
 
@@ -259,9 +259,9 @@ Training 链路当前支持：
 ### P1：Memory 质量、治理与可解释性
 
 - `memory_service.py` 仍然较集中，可在验证稳定后再拆成更小的 domain services。
-- Memory V2 MVP 已落地，但 benchmark harness 尚未完成。
+- Memory V2 MVP 已落地，regression harness 已纳入 `npm run check`。
 - rollback、merge、privacy tier、更完整的 sensitivity controls 尚未完成。
-- exact / full-text memory search 与更清晰的 memory trace 仍需补齐。
+- exact / full-text 基础召回已补齐；中文姓名、专有名词、更长原话片段和更清晰的 memory trace 仍需继续扩展。
 - 长期记忆 recall 质量还缺系统化回归集和评估指标。
 
 ### P1：模型路由与运行稳定性
@@ -309,8 +309,8 @@ Training 链路当前支持：
 
 1. 修复本地验证基线：Python 依赖、前端 typecheck、web build、integration suite。
 2. 把 README / `agent.md` / 本文件中的验证命令更新为当前可执行口径。
-3. Memory benchmark / regression harness 已新增，后续改 retrieval 和治理前必须先跑。
-4. 增加 exact / full-text memory search 和更完整的 trace。
+3. Memory regression harness 已纳入 `npm run check`，后续改 retrieval 和治理前必须先跑。
+4. 继续扩展 exact / full-text 覆盖面，并补更完整的 memory trace。
 5. 强化 provider health check、fallback policy、route policy。
 6. 在真实 GPU 环境验证 local training，补训练效果 A/B 对比。
 7. 补 Import 的大文件异步、进度、断点和更多微信格式。
@@ -373,7 +373,6 @@ python scripts/run_mvp_regression.py
 
 - `README.md`
 - `agent.md`
-- `future.md`
 - `docs/architecture.md`
 - `docs/adrs/0001-mvp-foundation.md`
 - `docs/adrs/0006-companion-memory-v2.md`

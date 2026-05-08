@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -71,6 +71,22 @@ FACT_KEY_STOPWORDS = {
     "keep",
     "tone",
 }
+EXACT_SEARCH_STOPWORDS = FACT_KEY_STOPWORDS | {
+    "what",
+    "when",
+    "where",
+    "who",
+    "which",
+    "did",
+    "about",
+    "style",
+    "response",
+    "answer",
+    "happened",
+    "talked",
+    "discussed",
+}
+
 
 def _normalized_content(content: str) -> str:
     lowered = normalize_whitespace(content).lower()
@@ -150,6 +166,135 @@ def _memory_strength(memory: Memory) -> float:
     if memory.details.get("current_version", True):
         strength += 0.3
     return round(strength, 4)
+
+
+def _searchable_metadata_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, dict):
+        return " ".join(_searchable_metadata_text(item) for item in value.values())
+    if isinstance(value, list):
+        return " ".join(_searchable_metadata_text(item) for item in value)
+    return str(value)
+
+
+def _memory_search_text(memory: Memory) -> str:
+    return normalize_whitespace(
+        " ".join(
+            item
+            for item in (
+                memory.content,
+                _memory_label(memory),
+                str(memory.details.get("fact_key") or ""),
+                str(memory.details.get("dedupe_key") or ""),
+                _searchable_metadata_text(memory.details.get("tags")),
+                _searchable_metadata_text(memory.details.get("entities")),
+            )
+            if item
+        )
+    )
+
+
+def _exact_query_terms(query: str) -> list[str]:
+    normalized_query = _normalized_content(query)
+    tokens = [
+        token
+        for token in tokenize(query)
+        if token not in EXACT_SEARCH_STOPWORDS and (len(token) > 1 or token.isdigit())
+    ]
+    terms: list[str] = []
+    if len(normalized_query) >= 4:
+        terms.append(normalized_query)
+    for token in tokens:
+        if token not in terms:
+            terms.append(token)
+    return terms[:12]
+
+
+def _phrase_windows(tokens: list[str], *, min_size: int = 2, max_size: int = 4) -> list[str]:
+    phrases: list[str] = []
+    for size in range(min_size, max_size + 1):
+        for index in range(0, max(len(tokens) - size + 1, 0)):
+            phrase = " ".join(tokens[index : index + size])
+            if phrase not in phrases:
+                phrases.append(phrase)
+    return phrases
+
+
+def _exact_memory_score(memory: Memory, query: str) -> float:
+    search_text = _memory_search_text(memory)
+    normalized_text = _normalized_content(search_text)
+    normalized_query = _normalized_content(query)
+    if not normalized_text:
+        return 0.0
+
+    score = 0.0
+    if len(normalized_query) >= 4 and normalized_query in normalized_text:
+        score += 12.0
+
+    meaningful_tokens = [
+        token
+        for token in tokenize(query)
+        if token not in EXACT_SEARCH_STOPWORDS and (len(token) > 1 or token.isdigit())
+    ]
+    memory_tokens = set(tokenize(search_text))
+    meaningful_token_set = set(meaningful_tokens)
+    overlap = meaningful_token_set.intersection(memory_tokens)
+    if overlap:
+        score += len(overlap) * 2.0
+        score += (len(overlap) / max(len(meaningful_token_set), 1)) * 4.0
+
+    normalized_with_spaces = normalize_whitespace(re.sub(r"[^a-z0-9\u4e00-\u9fff']+", " ", search_text.lower()))
+    for phrase in _phrase_windows(meaningful_tokens):
+        if phrase in normalized_with_spaces:
+            score += min(len(phrase.split()), 4) * 1.5
+
+    return round(score, 4)
+
+
+def _merge_memory_rows(*groups: list[Memory]) -> list[Memory]:
+    merged: dict[str, Memory] = {}
+    for group in groups:
+        for row in group:
+            merged.setdefault(str(row.id), row)
+    return list(merged.values())
+
+
+def _exact_candidate_memories(
+    db: Session,
+    *,
+    user_id: UUID,
+    query: str,
+    persona_id: UUID | None,
+    memory_types: list[MemoryType] | None,
+    limit: int,
+) -> list[Memory]:
+    terms = _exact_query_terms(query)
+    if not terms:
+        return []
+
+    statement = (
+        select(Memory)
+        .where(Memory.user_id == user_id)
+        .where(or_(*(Memory.content.ilike(f"%{term}%") for term in terms)))
+        .order_by(desc(Memory.updated_at))
+        .limit(max(limit * 8, 40))
+    )
+    if persona_id:
+        statement = statement.where(Memory.persona_id == persona_id)
+    if memory_types:
+        statement = statement.where(Memory.memory_type.in_(memory_types))
+    rows = db.scalars(statement).all()
+
+    return sorted(
+        [row for row in rows if _exact_memory_score(row, query) > 0],
+        key=lambda row: (_exact_memory_score(row, query), row.updated_at),
+        reverse=True,
+    )[: max(limit * 3, 10)]
 
 
 def _line_for_profile(memory: Memory) -> str:
@@ -1503,6 +1648,16 @@ def search_memories(
     vector = embedding_provider.embed(query)
     ids = vector_index.search(vector=vector, user_id=user_id, persona_id=persona_id, limit=limit)
     allowed = {memory_type.value for memory_type in memory_types} if memory_types else None
+    user_uuid = UUID(user_id)
+    persona_uuid = UUID(persona_id) if persona_id else None
+    exact_rows = _exact_candidate_memories(
+        db,
+        user_id=user_uuid,
+        query=query,
+        persona_id=persona_uuid,
+        memory_types=memory_types,
+        limit=limit,
+    )
 
     rows: list[Memory] = []
     if ids:
@@ -1528,8 +1683,6 @@ def search_memories(
             statement = statement.where(Memory.memory_type.in_(memory_types))
         rows = db.scalars(statement).all()
 
-    user_uuid = UUID(user_id)
-    persona_uuid = UUID(persona_id) if persona_id else None
     fact_seed_rows: list[Memory] = []
     if route == "profile":
         fact_seed_rows = _fact_backed_memories(
@@ -1559,11 +1712,7 @@ def search_memories(
         episodic_rows = db.scalars(statement).all()
         fact_seed_rows = [item for item in episodic_rows if _memory_label(item) == "episodic"][:limit]
 
-    if fact_seed_rows:
-        merged_rows: dict[str, Memory] = {str(item.id): item for item in fact_seed_rows}
-        for row in rows:
-            merged_rows.setdefault(str(row.id), row)
-        rows = list(merged_rows.values())
+    rows = _merge_memory_rows(exact_rows, fact_seed_rows, rows)
 
     query_tokens = set(tokenize(query))
     candidates = [item for item in rows if _is_searchable_memory(item)]
@@ -1578,6 +1727,7 @@ def search_memories(
             1 if route == "episodic" and _memory_label(item) == "episodic" else 0,
             1 if item.details.get("pinned") else 0,
             1 if item.details.get("current_version", True) else 0,
+            _exact_memory_score(item, query),
             len(query_tokens.intersection(tokenize(item.content))),
             _memory_strength(item),
             item.updated_at,

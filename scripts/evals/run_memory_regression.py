@@ -240,6 +240,50 @@ def _episodic_recall(client: TestClient, user_id: str, persona: dict[str, Any]) 
     )
 
 
+def _exact_phrase_recall(client: TestClient, user_id: str, persona: dict[str, Any]) -> EvalResult:
+    _post_memory(
+        client,
+        user_id=user_id,
+        persona_id=persona["id"],
+        content="Alice asked me to send the release summary before Friday.",
+        memory_type="episodic",
+        label="episodic",
+        metadata={"entities": ["Alice", "release summary"]},
+    )
+    _post_memory(
+        client,
+        user_id=user_id,
+        persona_id=persona["id"],
+        content="I prefer concise answers with practical steps.",
+        label="preference",
+    )
+    rows = _assert_response(
+        client.post(
+            "/api/v1/memories/search",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["id"],
+                "query": "What did Alice ask about the release summary?",
+                "limit": 5,
+            },
+        )
+    )
+    top = rows[0] if rows else {}
+    top_content = top.get("content", "").lower()
+    checks = {
+        "has_results": bool(rows),
+        "top_is_episodic": top.get("metadata", {}).get("memory_label") == "episodic",
+        "top_mentions_alice": "alice" in top_content,
+        "top_mentions_release_summary": "release summary" in top_content,
+    }
+    return EvalResult(
+        name="exact_phrase_recall",
+        passed=all(checks.values()),
+        checks=checks,
+        details={"top_result": top, "result_count": len(rows)},
+    )
+
+
 def _chat_grounding(client: TestClient, user_id: str, persona: dict[str, Any]) -> EvalResult:
     first = _assert_response(
         client.post(
@@ -391,6 +435,7 @@ def _gated_candidate_approval(client: TestClient, user_id: str, persona: dict[st
 EVALS: dict[str, Callable[[TestClient, str, dict[str, Any]], EvalResult]] = {
     "profile_preference_recall": _profile_preference_recall,
     "episodic_recall": _episodic_recall,
+    "exact_phrase_recall": _exact_phrase_recall,
     "chat_grounding": _chat_grounding,
     "duplicate_reinforcement": _duplicate_reinforcement,
     "conflict_supersede": _conflict_supersede,
