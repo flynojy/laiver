@@ -445,3 +445,17 @@ python scripts/run_mvp_regression.py
 - 本轮完成：新增可复用 `ModelSwitcher` 前端组件，并在 Settings 页面提供当前默认模型、健康/fallback 状态、一键检查和一键切换默认 provider 的第一版 UI。
 - 本轮测试：完整 `PATH=/opt/homebrew/opt/node@22/bin:.venv/bin:$PATH npm run check` 通过，当前集成测试 52 个、memory regression 7 个。
 - 下一步建议：把模型切换 UI 从 Settings 中进一步产品化，例如增加 Provider health cache、切换前自动 validate、失败回滚提示，以及独立的模型管理/切换快捷入口。
+
+### 2026-05-09：推送前进度汇总
+
+- 当前仓库状态：`main` 已包含协作续接规则、模型路由 fallback tracing、DeepSeek 本地配置记录、接口规范和模型切换 UI 第一版；本地 `.env` 存有 DeepSeek 测试 key，但 `.env` 被 `.gitignore` 忽略，不会上传。
+- 当前验证基线：最近完整 `PATH=/opt/homebrew/opt/node@22/bin:.venv/bin:$PATH npm run check` 已通过，覆盖 API lint、52 个集成测试、7 个 memory regression、Web typecheck 和 Web production build。
+- 当前 live 能力：DeepSeek provider 通过 `/model-providers/bootstrap` 和 `/model-providers/validate` 可完成 live check，结果曾验证为 `health_status=healthy`、`completion_preview=pong-live`。
+- 未来 P1：模型切换 UI 继续产品化，增加切换前自动 validate、失败回滚提示、provider health cache、独立快捷入口或模型管理页。
+- 未来 P1：继续细化 fallback policy，包括 `none` 策略的 API 错误语义、备用 provider 链路、多 provider health cache、真实 DeepSeek/Ollama/Local Adapter live check。
+- 未来 P1：继续强化 Memory 可解释性，补更清晰 memory trace、中文姓名/专有名词/长原话片段 regression、rollback/merge/privacy tier。
+- 未来 P1：真实 GPU 环境验证 local fine-tuning，补显存/耗时/失败恢复、artifact 兼容性和 A/B 效果评估。
+- 未来 P2：Import 工程化，补更多微信导出格式、大文件异步、进度反馈、错误恢复、断点续传、附件/撤回/引用/表情等复杂消息。
+- 未来 P2：Skill 平台化，补 marketplace、版本更新、签名校验、权限审核和沙箱执行。
+- 未来 P2：Connector 扩展，在 Feishu 稳定后补微信、Telegram、Email，并增强 live 部署、重试和可观测性。
+- 未来 P2：Dashboard 产品体验 polish，重点改善 Onboarding、Memory、Training、Connector 页面，不改成营销页。
