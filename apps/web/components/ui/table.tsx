@@ -13,7 +13,7 @@ export function TableHead({
   return (
     <th
       className={cn(
-        "px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]",
+        "px-3 py-2 text-left text-xs font-medium text-[var(--muted-foreground)]",
         className
       )}
       {...props}
@@ -34,6 +34,6 @@ export function TableCell({
   className,
   ...props
 }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("px-4 py-4 text-sm", className)} {...props} />;
+  return <td className={cn("px-3 py-3 text-sm", className)} {...props} />;
 }
 

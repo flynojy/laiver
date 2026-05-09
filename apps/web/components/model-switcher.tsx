@@ -47,7 +47,7 @@ export function ModelSwitcher({
         <CardDescription>Switch the agent default provider after checking health and fallback status.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg border border-[color:var(--border)] bg-[#faf8f4] p-4">
+        <div className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4">
           <div className="flex flex-wrap gap-2">
             <Badge>current</Badge>
             {defaultProvider ? <Badge>{defaultProvider.provider_type}</Badge> : null}
@@ -75,7 +75,7 @@ export function ModelSwitcher({
                 type="button"
                 className={[
                   "w-full rounded-lg border p-3 text-left transition",
-                  isSelected ? "border-[var(--accent)] bg-white" : "border-[color:var(--border)] bg-[#faf8f4]"
+                  isSelected ? "border-[var(--accent)] bg-white" : "border-[color:var(--border)] bg-[var(--muted)]"
                 ].join(" ")}
                 onClick={() => provider.id && onSelect(provider.id)}
               >

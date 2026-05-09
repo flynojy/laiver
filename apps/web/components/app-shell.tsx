@@ -36,16 +36,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <div className="mx-auto flex min-h-screen max-w-[1600px] gap-6 px-4 py-4 sm:px-6">
-        <aside className="hidden w-[280px] shrink-0 flex-col rounded-[2rem] border border-white/60 bg-[linear-gradient(180deg,#102a43_0%,#173f5f_50%,#f3efe7_100%)] p-5 text-white shadow-panel lg:flex">
-          <div className="rounded-[1.5rem] bg-white/10 p-5 backdrop-blur">
-            <p className="text-xs uppercase tracking-[0.3em] text-white/70">Personal Agent</p>
-            <h1 className="mt-3 text-2xl font-semibold">MVP Validation Console</h1>
-            <p className="mt-3 text-sm leading-6 text-white/80">
-              Keep the import, Persona, memory, agent, and skill runtime loop stable before expanding business scope.
+      <div className="mx-auto flex min-h-screen max-w-[1480px] gap-8 px-6 py-8">
+        <aside className="hidden w-[240px] shrink-0 flex-col border-r border-[color:var(--border)] pr-6 lg:flex">
+          <div className="pb-8">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              Laiver
             </p>
+            <h1 className="mt-2 text-base font-medium tracking-tight text-[var(--foreground)]">
+              Personal Agent
+            </h1>
           </div>
-          <nav className="mt-6 space-y-2">
+          <nav className="space-y-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href;
@@ -54,22 +55,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
-                    active ? "bg-white text-slate-900" : "text-white/80 hover:bg-white/10 hover:text-white"
+                    "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+                    active
+                      ? "bg-[var(--subtle)] text-[var(--foreground)]"
+                      : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
+                  <Icon className="h-4 w-4 shrink-0 opacity-70" />
+                  <span className="truncate">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
-          <div className="mt-auto rounded-[1.5rem] bg-slate-950/20 p-4 text-sm text-white/80">
-            The current console now covers imports, Persona, memories, skills, model providers, and the first local
-            fine-tuning workflow.
+          <div className="mt-auto pt-8">
+            <p className="text-xs leading-5 text-[var(--muted-foreground)]">
+              Imports · Persona · Memory · Skills · Providers · Local fine-tuning.
+            </p>
           </div>
         </aside>
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 min-w-0">{children}</main>
       </div>
     </div>
   );

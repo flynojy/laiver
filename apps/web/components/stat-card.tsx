@@ -1,5 +1,3 @@
-import { ArrowUpRight } from "lucide-react";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function StatCard({
@@ -12,16 +10,14 @@ export function StatCard({
   description: string;
 }) {
   return (
-    <Card className="bg-white/90">
-      <CardHeader className="pb-3">
-        <CardDescription>{title}</CardDescription>
-        <CardTitle className="flex items-center justify-between text-3xl">
-          {value}
-          <ArrowUpRight className="h-5 w-5 text-[var(--muted-foreground)]" />
-        </CardTitle>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardDescription className="text-xs">{title}</CardDescription>
+        <CardTitle className="text-2xl font-medium">{value}</CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 text-sm text-[var(--muted-foreground)]">{description}</CardContent>
+      <CardContent className="pt-0 text-xs leading-5 text-[var(--muted-foreground)]">
+        {description}
+      </CardContent>
     </Card>
   );
 }
-

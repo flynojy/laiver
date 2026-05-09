@@ -257,8 +257,8 @@ export default function MemoriesPage() {
         badge="Profile + Conflict"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {status ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
           <Card className="bg-white/88">
@@ -282,7 +282,7 @@ export default function MemoriesPage() {
             <div className="space-y-2">
               <Label>Memory Type</Label>
               <select
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                 value={memoryType}
                 onChange={(event) => setMemoryType(event.target.value as MemoryType)}
               >
@@ -329,7 +329,7 @@ export default function MemoriesPage() {
               <div className="space-y-2">
                 <Label>Type</Label>
                 <select
-                  className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                   value={filterType}
                   onChange={(event) => setFilterType(event.target.value)}
                 >
@@ -343,7 +343,7 @@ export default function MemoriesPage() {
               <div className="space-y-2">
                 <Label>Source</Label>
                 <select
-                  className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                   value={filterSource}
                   onChange={(event) => setFilterSource(event.target.value)}
                 >
@@ -358,7 +358,7 @@ export default function MemoriesPage() {
               <div className="space-y-2">
                 <Label>State</Label>
                 <select
-                  className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                   value={filterState}
                   onChange={(event) => setFilterState(event.target.value)}
                 >
@@ -389,7 +389,7 @@ export default function MemoriesPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {profileSummary ? (
-                <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm leading-6">
+                <div className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4 text-sm leading-6">
                   <p className="whitespace-pre-wrap">{profileSummary}</p>
                 </div>
               ) : (
@@ -399,7 +399,7 @@ export default function MemoriesPage() {
               {Array.isArray(profileSnapshot.by_bucket) ? null : (
                 <div className="grid gap-3 md:grid-cols-3">
                   {Object.entries((profileSnapshot.by_bucket as Record<string, unknown>) ?? {}).map(([bucket, value]) => (
-                    <div key={bucket} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+                    <div key={bucket} className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4">
                       <p className="text-sm font-medium capitalize">{bucket}</p>
                       <div className="mt-3 space-y-2 text-sm text-[var(--muted-foreground)]">
                         {Array.isArray(value) && value.length > 0 ? (
@@ -421,14 +421,14 @@ export default function MemoriesPage() {
               <CardDescription>User profile and relationship state are rebuilt from active facts so the companion has something more stable than freeform notes.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-3 rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+              <div className="space-y-3 rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium">User Profile</p>
                   {userProfileSnapshot.profile_version ? <Badge>v{String(userProfileSnapshot.profile_version)}</Badge> : null}
                   {userProfileSnapshot.source_fact_count ? <Badge>{String(userProfileSnapshot.source_fact_count)} facts</Badge> : null}
                 </div>
                 {Object.keys(userProfileSnapshot).length > 0 ? (
-                  <pre className="overflow-x-auto rounded-[1rem] bg-[#faf8f4] p-3 text-xs leading-6">
+                  <pre className="overflow-x-auto rounded-lg bg-[var(--muted)] p-3 text-xs leading-6">
                     {JSON.stringify(userProfileSnapshot, null, 2)}
                   </pre>
                 ) : (
@@ -436,7 +436,7 @@ export default function MemoriesPage() {
                 )}
               </div>
 
-              <div className="space-y-3 rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+              <div className="space-y-3 rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium">Relationship State</p>
                   {relationshipStateSnapshot.relationship_stage ? (
@@ -447,7 +447,7 @@ export default function MemoriesPage() {
                   ) : null}
                 </div>
                 {Object.keys(relationshipStateSnapshot).length > 0 ? (
-                  <pre className="overflow-x-auto rounded-[1rem] bg-[#faf8f4] p-3 text-xs leading-6">
+                  <pre className="overflow-x-auto rounded-lg bg-[var(--muted)] p-3 text-xs leading-6">
                     {JSON.stringify(relationshipStateSnapshot, null, 2)}
                   </pre>
                 ) : (
@@ -467,7 +467,7 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No memories yet.</p>
               ) : (
                 recentMemories.slice(0, 6).map((memory) => (
-                  <div key={memory.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div key={memory.id} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{memory.memory_type}</Badge>
                       <Badge>{memoryLabel(memory)}</Badge>
@@ -498,7 +498,7 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No episodes yet.</p>
               ) : (
                 recentEpisodes.slice(0, 6).map((episode) => (
-                  <div key={episode.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div key={episode.id} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{episode.source_type}</Badge>
                       {episode.speaker_role ? <Badge>{episode.speaker_role}</Badge> : null}
@@ -526,7 +526,7 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No facts yet.</p>
               ) : (
                 recentFacts.slice(0, 6).map((fact) => (
-                  <div key={fact.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div key={fact.id} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{fact.fact_type}</Badge>
                       <Badge>{fact.status}</Badge>
@@ -558,7 +558,7 @@ export default function MemoriesPage() {
                 recentRevisions.slice(0, 6).map((revision) => (
                   <div
                     key={revision.id}
-                    className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4"
+                    className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{revision.op}</Badge>
@@ -591,7 +591,7 @@ export default function MemoriesPage() {
                 recentCandidates.slice(0, 8).map((candidate) => (
                   <div
                     key={candidate.id}
-                    className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4"
+                    className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{candidate.candidate_type}</Badge>
@@ -640,11 +640,11 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No conflict groups yet.</p>
               ) : (
                 conflictGroups.map((group) => (
-                  <div key={group.group_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div key={group.group_id} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
                     <p className="text-sm font-medium">{group.fact_key || group.group_id}</p>
                     <div className="mt-3 space-y-2">
                       {group.items.map((item) => (
-                        <div key={item.id} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
+                        <div key={item.id} className="rounded-md bg-[var(--muted)] p-3 text-sm leading-6">
                           <div className="flex flex-wrap gap-2">
                             <Badge>{item.state}</Badge>
                             <Badge>{item.current_version ? "current" : "superseded"}</Badge>
@@ -670,11 +670,11 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No duplicate groups in the current filtered set.</p>
               ) : (
                 duplicateGroups.map((group) => (
-                  <div key={String(group[0]?.metadata?.dedupe_key ?? group[0]?.id)} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div key={String(group[0]?.metadata?.dedupe_key ?? group[0]?.id)} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
                     <p className="text-sm font-medium">{String(group[0]?.metadata?.dedupe_key ?? "unknown")}</p>
                     <div className="mt-3 space-y-2">
                       {group.map((memory) => (
-                        <div key={memory.id} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
+                        <div key={memory.id} className="rounded-md bg-[var(--muted)] p-3 text-sm leading-6">
                           <div className="flex flex-wrap gap-2">
                             <Badge>{memoryLabel(memory)}</Badge>
                             <Badge>{memoryState(memory)}</Badge>
@@ -695,9 +695,9 @@ export default function MemoriesPage() {
               <CardDescription>Filtered list with quick curator actions.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-hidden rounded-[1.25rem] border border-[color:var(--border)]">
+              <div className="overflow-hidden rounded-lg border border-[color:var(--border)]">
                 <Table>
-                  <thead className="bg-[#faf8f4]">
+                  <thead className="bg-[var(--muted)]">
                     <tr>
                       <TableHead>Type</TableHead>
                       <TableHead>Label</TableHead>

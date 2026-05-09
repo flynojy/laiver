@@ -260,8 +260,8 @@ export default function PersonaPage() {
         badge="Evidence + Preview"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {status ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="bg-white/88">
@@ -273,7 +273,7 @@ export default function PersonaPage() {
             <div className="space-y-2">
               <Label>Import Source</Label>
               <select
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                 value={selectedImportId}
                 onChange={(event) => setSelectedImportId(event.target.value)}
               >
@@ -288,7 +288,7 @@ export default function PersonaPage() {
             <div className="space-y-2">
               <Label>Target Speaker</Label>
               <select
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                 value={selectedSourceSpeaker}
                 onChange={(event) => setSelectedSourceSpeaker(event.target.value)}
               >
@@ -302,7 +302,7 @@ export default function PersonaPage() {
             </div>
 
             {speakerOptions.length > 0 ? (
-              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+              <div className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4 text-sm">
                 <p className="font-medium">Speaker Summary</p>
                 <div className="mt-3 space-y-2">
                   {speakerOptions.map((option) => (
@@ -330,7 +330,7 @@ export default function PersonaPage() {
                 personas.map((persona) => (
                   <button
                     key={persona.id}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-[#faf8f4] px-4 py-3 text-left"
+                    className="w-full rounded-md border border-[color:var(--border)] bg-[var(--muted)] px-4 py-3 text-left"
                     onClick={() => {
                       setSavedPersona(persona);
                       setDraftPersona(persona);
@@ -381,13 +381,13 @@ export default function PersonaPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Confidence Scores</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.confidence_scores ?? {}, null, 2)}
                       </pre>
                     </div>
                     <div className="space-y-2">
                       <Label>Field Evidence</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.evidence_samples ?? {}, null, 2)}
                       </pre>
                     </div>
@@ -396,13 +396,13 @@ export default function PersonaPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Response Style</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.response_style ?? {}, null, 2)}
                       </pre>
                     </div>
                     <div className="space-y-2">
                       <Label>Relationship Style</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.relationship_style ?? {}, null, 2)}
                       </pre>
                     </div>
@@ -506,11 +506,11 @@ export default function PersonaPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Saved Persona Preview</Label>
-                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{savedPreview}</pre>
+                  <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-xs leading-6">{savedPreview}</pre>
                 </div>
                 <div className="space-y-2">
                   <Label>Edited Draft Preview</Label>
-                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{draftPreview}</pre>
+                  <pre className="overflow-x-auto rounded-md bg-[var(--muted)] p-4 text-xs leading-6">{draftPreview}</pre>
                 </div>
               </div>
             </CardContent>
