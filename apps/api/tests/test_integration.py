@@ -40,6 +40,9 @@ def build_client(db_path: Path, extra_env: dict[str, str] | None = None) -> Test
     os.environ["LOCAL_ADAPTER_IDLE_TTL_SECONDS"] = "900"
     os.environ["LOCAL_ADAPTER_CLEANUP_INTERVAL_SECONDS"] = "60"
     os.environ["LOCAL_ADAPTER_GENERATE_TIMEOUT_SECONDS"] = "20"
+    os.environ["DEEPSEEK_API_KEY"] = ""
+    os.environ["DEEPSEEK_BASE_URL"] = "https://api.deepseek.com"
+    os.environ["DEEPSEEK_MODEL"] = "deepseek-chat"
     for key, value in (extra_env or {}).items():
         os.environ[key] = value
     _clear_app_modules()
@@ -1882,6 +1885,36 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertFalse(payload["api_key_configured"])
         self.assertFalse(payload["completion_ok"])
         self.assertIn("skipped", payload["error"].lower())
+
+    def test_deepseek_provider_uses_settings_api_key_when_env_ref_is_not_exported(self) -> None:
+        previous_key = os.environ.pop("DEEPSEEK_API_KEY", None)
+        tempdir = TEST_RUN_ROOT / "deepseek-settings-key"
+        shutil.rmtree(tempdir, ignore_errors=True)
+        tempdir.mkdir(parents=True, exist_ok=True)
+        client = build_client(
+            tempdir / "test.db",
+            {
+                "DEEPSEEK_API_KEY": "settings-only-key",
+                "DEEPSEEK_BASE_URL": "mock://success/deepseek",
+            },
+        )
+        client.__enter__()
+        os.environ.pop("DEEPSEEK_API_KEY", None)
+        try:
+            bootstrap_runtime(client)
+            response = client.post("/api/v1/model-providers/validate", json={"check_stream": False, "check_tool_call": False})
+            response.raise_for_status()
+            payload = response.json()
+
+            self.assertEqual(payload["provider_type"], "deepseek")
+            self.assertEqual(payload["health_status"], "healthy")
+            self.assertTrue(payload["api_key_configured"])
+            self.assertTrue(payload["completion_ok"])
+        finally:
+            client.__exit__(None, None, None)
+            shutil.rmtree(tempdir, ignore_errors=True)
+            if previous_key is not None:
+                os.environ["DEEPSEEK_API_KEY"] = previous_key
 
     def test_fine_tune_job_creation_exports_local_dataset(self) -> None:
         user_id, _, commit, _ = create_full_state(self.client)

@@ -9,6 +9,7 @@ import type {
   ProviderType
 } from "@agent/shared";
 
+import { ModelSwitcher } from "@/components/model-switcher";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -312,6 +313,16 @@ export default function SettingsPage() {
         </Card>
 
         <div className="space-y-4">
+          <ModelSwitcher
+            providers={providers}
+            selectedProviderId={activeProviderId}
+            validation={validation}
+            loading={loading}
+            onSelect={setActiveProviderId}
+            onSwitchDefault={(providerId) => handleQuickAction(providerId, { is_default: true })}
+            onValidate={handleValidate}
+          />
+
           <Card className="bg-white/88">
             <CardHeader>
               <CardTitle>Add Provider</CardTitle>

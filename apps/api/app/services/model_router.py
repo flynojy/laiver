@@ -529,7 +529,13 @@ class ModelRouterService:
                 return settings.deepseek_api_key
             return ""
         if api_key_ref.startswith("env:"):
-            return os.getenv(api_key_ref.split(":", 1)[1], "")
+            env_name = api_key_ref.split(":", 1)[1]
+            env_value = os.getenv(env_name, "")
+            if env_value:
+                return env_value
+            if env_name == "DEEPSEEK_API_KEY":
+                return settings.deepseek_api_key
+            return ""
         if api_key_ref.startswith("literal:"):
             return api_key_ref.split(":", 1)[1]
         return api_key_ref

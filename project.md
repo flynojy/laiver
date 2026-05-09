@@ -327,6 +327,8 @@ Training 链路当前支持：
 - 每次对话结束在最终回复中说明接下来需要做的工作。
 - 每次完成任务都在本文档追加或更新进度备注，便于对话中断后续接。
 - Codex / Agent 协作细则见 `agent.md`；接手新任务时必须同时阅读本文档和 `agent.md`。
+- 开发时优先保持模块解耦，新增能力应明确归属到 domain service、schema、router、前端组件或共享类型边界，避免后续新增模块和修改模块变困难。
+- 新增或变更对外接口时，必须同步记录到本文档的接口规范区或相关计划文档，说明 endpoint、请求/响应 shape、使用场景和兼容性注意事项。
 - 改后端行为前，先读 `apps/api/tests/test_integration.py`。
 - 改 API shape 时，通常需要同步：
   - `apps/api/app/schemas`
@@ -388,7 +390,22 @@ python scripts/run_mvp_regression.py
 - `docs/plans/2026-04-23-memory-eval-matrix.md`
 - `apps/api/tests/test_integration.py`
 
-## 10. 进度备注
+## 10. 接口规范
+
+### Model Provider API
+
+- `GET /api/v1/model-providers`：列出 provider registry，用于 Settings / 模型切换 UI 展示可选模型。
+- `POST /api/v1/model-providers`：创建 provider；请求体使用 `ModelProviderCreate`，包括 `name`、`provider_type`、`base_url`、`model_name`、`api_key_ref`、`settings`、`is_default`、`is_enabled`。当 `is_default=true` 时，会取消其他默认 provider 并启用当前 provider。
+- `PATCH /api/v1/model-providers/{provider_id}`：更新 provider；常用于一键切换默认模型、启停 provider、更新 settings。切换默认 provider 时传 `{"is_default": true}`。
+- `POST /api/v1/model-providers/bootstrap`：若尚无默认 provider，则创建 DeepSeek 默认 provider，读取 `DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 和 `env:DEEPSEEK_API_KEY`。
+- `POST /api/v1/model-providers/validate`：验证 provider 健康状态；响应包含 `health_status`、`route_policy`、`fallback_policy`、`fallback_available`、completion/stream/tool 结果和错误信息。
+- `POST /api/v1/model-providers/complete`：直接调用 provider completion；响应包含 `route_policy`、`fallback_policy`、`fallback_used`、`fallback_reason` 和 `attempted_providers`，用于调试路由与降级。
+- `POST /api/v1/model-providers/stream`：直接调用 provider streaming；当前返回 `text/plain` chunk。
+- `GET /api/v1/model-providers/local-adapters/runtime`、`POST /api/v1/model-providers/{provider_id}/warm`、`POST /api/v1/model-providers/{provider_id}/evict`：Local Adapter runtime 管理接口。
+
+兼容性注意：当前 DeepSeek / OpenAI-compatible 走 Chat Completions 兼容协议，即 `POST {base_url}/chat/completions`；暂未接 OpenAI Responses API。模型切换 UI 应优先复用上述接口，不直接绕过后端读写数据库。
+
+## 11. 进度备注
 
 ### 2026-05-08：补充 Agent 续接协作规则
 
@@ -418,3 +435,13 @@ python scripts/run_mvp_regression.py
 - 本轮验证：通过 `get_settings()` 确认 `deepseek_key_configured=True`，DeepSeek base URL 为 `https://api.deepseek.com`，模型为 `deepseek-chat`。
 - 本轮记录：后续需要做类似 switchcc 的模型切换界面，支持一键切换默认 provider、验证 provider 健康状态、显示 fallback/route 信息，并让用户明确当前 Chat 使用哪个模型。
 - 下一步建议：先用 `/api/v1/model-providers/bootstrap` 创建 DeepSeek 默认 provider，再调用 `/api/v1/model-providers/validate` 做 live check；随后实现模型切换 UI。
+
+### 2026-05-09：补充接口规范、DeepSeek live check 和模型切换 UI 第一版
+
+- 本轮完成：在 `agent.md` 和本文档补充工程约束，明确开发中优先保持模块解耦，新增/变更对外接口必须同步记录接口规范。
+- 本轮完成：新增 Model Provider API 接口规范，记录 provider registry、bootstrap、validate、complete、stream 和 Local Adapter runtime 相关 endpoint。
+- 本轮完成：修正 `env:DEEPSEEK_API_KEY` 解析逻辑，优先读系统环境变量，缺失时回退到 Settings 从 `.env` 加载的 DeepSeek key；同时隔离集成测试，避免本地 `.env` 影响 mock fallback 基线。
+- 本轮验证：使用本地 DeepSeek key 对 `/model-providers/validate` 做 live check，结果 `health_status=healthy`、`completion_ok=True`、`completion_preview=pong-live`。
+- 本轮完成：新增可复用 `ModelSwitcher` 前端组件，并在 Settings 页面提供当前默认模型、健康/fallback 状态、一键检查和一键切换默认 provider 的第一版 UI。
+- 本轮测试：完整 `PATH=/opt/homebrew/opt/node@22/bin:.venv/bin:$PATH npm run check` 通过，当前集成测试 52 个、memory regression 7 个。
+- 下一步建议：把模型切换 UI 从 Settings 中进一步产品化，例如增加 Provider health cache、切换前自动 validate、失败回滚提示，以及独立的模型管理/切换快捷入口。
