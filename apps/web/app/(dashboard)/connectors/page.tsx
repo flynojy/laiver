@@ -31,7 +31,7 @@ function JsonPanel({ title, value }: { title: string; value: unknown }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
         {title}
       </p>
-      <pre className="mt-2 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+      <pre className="mt-2 overflow-x-auto rounded-md bg-[var(--muted)] p-3 text-xs leading-6">
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>
@@ -46,7 +46,7 @@ function MappingList({ mappings }: { mappings: ConnectorConversationMappingRecor
   return (
     <div className="space-y-3">
       {mappings.map((item) => (
-        <div key={item.mapping_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+        <div key={item.mapping_id} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
           <div className="flex flex-wrap gap-2">
             <Badge>{item.memory_scope}</Badge>
             {item.default_persona_id ? <Badge>persona-linked</Badge> : <Badge>persona-open</Badge>}
@@ -72,7 +72,7 @@ function DeliveryList({ deliveries }: { deliveries: ConnectorDeliveryRecord[] })
   return (
     <div className="space-y-3">
       {deliveries.map((item) => (
-        <div key={item.delivery_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+        <div key={item.delivery_id} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
           <div className="flex flex-wrap gap-2">
             <Badge>{item.connector_type}</Badge>
             <Badge>{item.delivery_status}</Badge>
@@ -196,8 +196,8 @@ export default function ConnectorsPage() {
         badge="Receive + Reply"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {status ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
         <Card className="bg-white/88">
@@ -208,7 +208,7 @@ export default function ConnectorsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <pre className="overflow-x-auto rounded-[1.25rem] bg-[#faf8f4] p-4 text-xs leading-6">
+            <pre className="overflow-x-auto rounded-lg bg-[var(--muted)] p-4 text-xs leading-6">
               {JSON.stringify(skeleton ?? {}, null, 2)}
             </pre>
             <Button
@@ -254,7 +254,7 @@ export default function ConnectorsPage() {
               {connectors.map((connector) => (
                 <button
                   key={connector.connector_id}
-                  className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
+                  className="w-full rounded-lg border border-[color:var(--border)] bg-[var(--muted)] px-4 py-4 text-left"
                   onClick={async () => {
                     setActiveConnectorId(connector.connector_id);
                     await refresh(connector.connector_id);
@@ -299,7 +299,7 @@ export default function ConnectorsPage() {
                     <div className="space-y-2">
                       <Label>Mode</Label>
                       <select
-                        className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                        className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                         value={mode}
                         onChange={(event) => setConfigValue("mode", event.target.value)}
                       >
@@ -310,7 +310,7 @@ export default function ConnectorsPage() {
                     <div className="space-y-2">
                       <Label>Delivery Mode</Label>
                       <select
-                        className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                        className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                         value={deliveryMode}
                         onChange={(event) => setConfigValue("delivery_mode", event.target.value)}
                       >
@@ -346,7 +346,7 @@ export default function ConnectorsPage() {
                     <div className="space-y-2">
                       <Label>Receive ID Type</Label>
                       <select
-                        className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                        className="w-full rounded-md border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
                         value={String(configDraft.receive_id_type ?? "chat_id")}
                         onChange={(event) => setConfigValue("receive_id_type", event.target.value)}
                       >
@@ -364,7 +364,7 @@ export default function ConnectorsPage() {
                     />
                   </div>
 
-                  <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[#faf8f4] px-4 py-3 text-sm">
+                  <label className="flex items-center gap-3 rounded-md border border-[color:var(--border)] bg-[var(--muted)] px-4 py-3 text-sm">
                     <input
                       type="checkbox"
                       checked={configDraft.force_delivery_failure === true}
@@ -373,7 +373,7 @@ export default function ConnectorsPage() {
                     Force delivery failure for testing
                   </label>
 
-                  <pre className="overflow-x-auto rounded-[1.25rem] bg-[#faf8f4] p-4 text-xs leading-6">
+                  <pre className="overflow-x-auto rounded-lg bg-[var(--muted)] p-4 text-xs leading-6">
                     {JSON.stringify(configDraft, null, 2)}
                   </pre>
 

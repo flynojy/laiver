@@ -3,14 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --background: #f6f1e8;
-  --foreground: #102a43;
-  --card: rgba(255, 255, 255, 0.86);
-  --border: rgba(15, 23, 42, 0.1);
-  --accent: #0f766e;
-  --accent-foreground: #f8fafc;
-  --muted: #e9e3d8;
-  --muted-foreground: #52606d;
+  --background: #fbfaf7;
+  --foreground: #1f1f1d;
+  --card: #ffffff;
+  --border: rgba(15, 15, 15, 0.08);
+  --border-strong: rgba(15, 15, 15, 0.14);
+  --accent: #1f1f1d;
+  --accent-foreground: #ffffff;
+  --muted: #f3f1ec;
+  --muted-foreground: #6f6d68;
+  --subtle: #ebe9e3;
+  --ring: rgba(31, 31, 29, 0.18);
 }
 
 * {
@@ -18,17 +21,17 @@
 }
 
 html {
-  font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+  font-family: "Inter", "Noto Sans JP", "Hiragino Sans", "PingFang SC", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.14), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(23, 63, 95, 0.12), transparent 28%),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
+  letter-spacing: -0.005em;
 }
 
 a {
@@ -41,4 +44,3 @@ input,
 textarea {
   font: inherit;
 }
-

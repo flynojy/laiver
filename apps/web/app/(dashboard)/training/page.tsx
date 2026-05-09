@@ -56,7 +56,7 @@ function DatasetPreview({ detail }: { detail: FineTuneJobDetail | null }) {
   return (
     <div className="space-y-4">
       {detail.dataset_preview.map((sample, index) => (
-        <div key={`${detail.job.id}-${index}`} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+        <div key={`${detail.job.id}-${index}`} className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4">
           <p className="text-sm font-medium">Sample {index + 1}</p>
           <div className="mt-3 space-y-2 text-sm">
             {sample.messages.map((message, messageIndex) => (
@@ -237,8 +237,8 @@ export default function TrainingPage() {
         badge="Dataset + Model"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {status ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
         <div className="space-y-4">
@@ -326,7 +326,7 @@ export default function TrainingPage() {
                 jobs.map((job) => (
                   <button
                     key={job.id}
-                    className="w-full rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
+                    className="w-full rounded-lg border border-[color:var(--border)] bg-[var(--muted)] px-4 py-4 text-left"
                     onClick={async () => {
                       await refreshJobDetail(job.id);
                     }}
@@ -382,13 +382,13 @@ export default function TrainingPage() {
                     </Button>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+                    <div className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4 text-sm">
                       <p className="font-medium">Dataset</p>
                       <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.job.dataset_path}</p>
                       <p className="mt-3 font-medium">Config</p>
                       <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.job.config_path}</p>
                     </div>
-                    <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+                    <div className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4 text-sm">
                       <p className="font-medium">Output</p>
                       <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.job.output_dir}</p>
                       <p className="mt-3 font-medium">Split</p>
@@ -398,13 +398,13 @@ export default function TrainingPage() {
                     </div>
                   </div>
                   {detail.job.artifact_path ? (
-                    <div className="rounded-[1rem] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                       <p className="font-medium">Adapter Artifact</p>
                       <p className="mt-2 break-all">{detail.job.artifact_path}</p>
                     </div>
                   ) : null}
                   {detail.registered_provider ? (
-                    <div className="rounded-[1rem] border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                    <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium">Registered Provider</p>
                         <Badge>{detail.registered_provider.provider_type}</Badge>
@@ -423,12 +423,12 @@ export default function TrainingPage() {
                     </div>
                   ) : null}
                   {detail.job.error_message ? (
-                    <div className="rounded-[1rem] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                       <p className="font-medium">Last Error</p>
                       <p className="mt-2 whitespace-pre-wrap">{detail.job.error_message}</p>
                     </div>
                   ) : null}
-                  <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+                  <div className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4 text-sm">
                     <p className="font-medium">Launcher Command</p>
                     <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs leading-6">{detail.job.launcher_command}</pre>
                   </div>

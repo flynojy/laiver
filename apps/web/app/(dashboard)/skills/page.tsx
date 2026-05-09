@@ -26,7 +26,7 @@ function InvocationList({ invocations }: { invocations: SkillInvocationRecord[] 
   return (
     <div className="space-y-3">
       {invocations.map((item) => (
-        <div key={item.invocation_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+        <div key={item.invocation_id} className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4">
           <div className="flex flex-wrap gap-2">
             <Badge>{item.skill_slug}</Badge>
             <Badge>{item.tool_name}</Badge>
@@ -37,7 +37,7 @@ function InvocationList({ invocations }: { invocations: SkillInvocationRecord[] 
           <p className="mt-1 text-xs text-[var(--muted-foreground)]">
             started: {item.started_at ?? "n/a"} | finished: {item.finished_at ?? "n/a"}
           </p>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+          <pre className="mt-3 overflow-x-auto rounded-md bg-[var(--muted)] p-3 text-xs leading-6">
             {JSON.stringify(item.output, null, 2)}
           </pre>
           {item.error ? <p className="mt-2 text-xs text-red-600">{item.error}</p> : null}
@@ -153,8 +153,8 @@ export default function SkillsPage() {
         badge="Builtin + Community"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {status ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <div className="space-y-4">
@@ -189,7 +189,7 @@ export default function SkillsPage() {
               {skills.map((skill) => (
                 <button
                   key={skill.id}
-                  className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
+                  className="w-full rounded-lg border border-[color:var(--border)] bg-[var(--muted)] px-4 py-4 text-left"
                   onClick={() => setActiveSkillId(skill.id)}
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -222,9 +222,9 @@ export default function SkillsPage() {
                 type="file"
                 accept=".json,.zip,application/json,application/zip"
                 onChange={(event) => setSelectedPackage(event.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-[var(--muted-foreground)] file:mr-4 file:rounded-md file:border-0 file:bg-[#faf8f4] file:px-4 file:py-2 file:text-sm file:font-medium"
+                className="block w-full text-sm text-[var(--muted-foreground)] file:mr-4 file:rounded-md file:border-0 file:bg-[var(--muted)] file:px-4 file:py-2 file:text-sm file:font-medium"
               />
-              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm text-[var(--muted-foreground)]">
+              <div className="rounded-lg border border-[color:var(--border)] bg-[var(--muted)] p-4 text-sm text-[var(--muted-foreground)]">
                 <p>Selected package: {selectedPackage?.name ?? "none"}</p>
                 <p className="mt-2">Current approved handlers: `memory-search`, `task-extractor`.</p>
               </div>
@@ -264,13 +264,13 @@ export default function SkillsPage() {
                   <div className="grid gap-4 xl:grid-cols-2">
                     <div>
                       <p className="mb-2 text-sm font-medium">Manifest</p>
-                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-xl bg-[var(--muted)] p-4 text-xs leading-6">
                         {JSON.stringify(activeSkill.manifest, null, 2)}
                       </pre>
                     </div>
                     <div>
                       <p className="mb-2 text-sm font-medium">Runtime Config</p>
-                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-xl bg-[var(--muted)] p-4 text-xs leading-6">
                         {JSON.stringify(activeSkill.runtime_config, null, 2)}
                       </pre>
                     </div>

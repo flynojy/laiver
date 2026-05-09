@@ -120,8 +120,8 @@ export default function ImportsPage() {
         badge="Import -> Preview -> Commit"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {status ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
         <Card className="bg-white/88">
@@ -150,7 +150,7 @@ export default function ImportsPage() {
             </label>
 
             {preview ? (
-              <div className="rounded-[1.5rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+              <div className="rounded-xl border border-[color:var(--border)] bg-[var(--muted)] p-4 text-sm">
                 <p className="font-medium">{preview.file_name}</p>
                 <p className="mt-2 text-[var(--muted-foreground)]">
                   {preview.total_messages} messages, participants: {preview.detected_participants.join(" / ") || "unknown"}
@@ -200,9 +200,9 @@ export default function ImportsPage() {
             </CardHeader>
             <CardContent>
               {preview ? (
-                <div className="overflow-hidden rounded-[1.25rem] border border-[color:var(--border)]">
+                <div className="overflow-hidden rounded-lg border border-[color:var(--border)]">
                   <Table>
-                    <thead className="bg-[#faf8f4]">
+                    <thead className="bg-[var(--muted)]">
                       <tr>
                         <TableHead>#</TableHead>
                         <TableHead>Speaker</TableHead>
@@ -248,7 +248,7 @@ export default function ImportsPage() {
                   return (
                     <div
                       key={item.import_job.id}
-                      className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4"
+                      className="rounded-lg border border-[color:var(--border)] bg-[var(--card)] p-4"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium">{item.import_job.file_name}</p>

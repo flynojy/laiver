@@ -76,7 +76,7 @@ function StepBadge({ done, active }: { done: boolean; active: boolean }) {
   if (done) {
     return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
   }
-  return <span className={active ? "h-3 w-3 rounded-full bg-[var(--accent)]" : "h-3 w-3 rounded-full bg-[#d7d4ce]"} />;
+  return <span className={active ? "h-3 w-3 rounded-full bg-[var(--accent)]" : "h-3 w-3 rounded-full bg-[var(--subtle)]"} />;
 }
 
 export default function OnboardingPage() {
@@ -295,7 +295,7 @@ export default function OnboardingPage() {
             ].map((item) => (
               <button
                 key={item.key}
-                className="flex w-full items-start gap-3 rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-left"
+                className="flex w-full items-start gap-3 rounded-md border border-[color:var(--border)] bg-[var(--card)] p-4 text-left"
                 onClick={() => setStep(item.key)}
               >
                 <div className="mt-1">
@@ -342,7 +342,7 @@ export default function OnboardingPage() {
                     </div>
                     <div className="overflow-hidden rounded-md border border-[color:var(--border)]">
                       <Table>
-                        <thead className="bg-[#faf8f4]">
+                        <thead className="bg-[var(--muted)]">
                           <tr>
                             <TableHead>#</TableHead>
                             <TableHead>Speaker</TableHead>
@@ -364,7 +364,7 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 ) : imports.length > 0 ? (
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--card)] p-4 text-sm">
                     <p className="font-medium">Recent imports</p>
                     <div className="mt-3 space-y-2">
                       {imports.slice(0, 3).map((item) => (
@@ -434,7 +434,7 @@ export default function OnboardingPage() {
                       </select>
                     </div>
                     {persona ? (
-                      <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                      <div className="rounded-md border border-[color:var(--border)] bg-[var(--card)] p-4 text-sm">
                         <div className="flex flex-wrap gap-2">
                           <Badge>{persona.tone}</Badge>
                           <Badge>{persona.verbosity}</Badge>
@@ -444,7 +444,7 @@ export default function OnboardingPage() {
                         <p className="mt-2 text-[var(--muted-foreground)]">{persona.description || "Persona ready."}</p>
                       </div>
                     ) : personas.length > 0 ? (
-                      <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                      <div className="rounded-md border border-[color:var(--border)] bg-[var(--card)] p-4 text-sm">
                         <p className="font-medium">Existing Personas</p>
                         <p className="mt-2 text-[var(--muted-foreground)]">{personas.length} saved Persona records.</p>
                       </div>
@@ -475,7 +475,7 @@ export default function OnboardingPage() {
                   <Input value={baseModel} onChange={(event) => setBaseModel(event.target.value)} />
                 </div>
                 {trainingJob ? (
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--card)] p-4 text-sm">
                     <div className="flex flex-wrap gap-2">
                       <Badge>{trainingJob.job.status}</Badge>
                       <Badge>{trainingJob.job.backend}</Badge>
@@ -510,11 +510,11 @@ export default function OnboardingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--card)] p-4">
                     <p className="text-sm font-medium">Model Providers</p>
                     <p className="mt-2 text-2xl font-semibold">{providerCount}</p>
                   </div>
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--card)] p-4">
                     <p className="text-sm font-medium">Seeded Skills</p>
                     <p className="mt-2 text-2xl font-semibold">{skillCount}</p>
                   </div>

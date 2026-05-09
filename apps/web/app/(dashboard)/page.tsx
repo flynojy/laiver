@@ -51,7 +51,7 @@ export default function DashboardPage() {
             <Card key={item.title} className="bg-white/88">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-[var(--muted)] p-3 text-[var(--foreground)]">
+                  <div className="rounded-md bg-[var(--muted)] p-3 text-[var(--foreground)]">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
