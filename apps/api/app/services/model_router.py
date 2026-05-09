@@ -29,6 +29,11 @@ from app.schemas.runtime import (
 
 settings = get_settings()
 
+DEFAULT_ROUTE_POLICY = "default_enabled_provider"
+EXPLICIT_ROUTE_POLICY = "explicit_provider"
+DEFAULT_FALLBACK_POLICY = "mock_on_error"
+NO_FALLBACK_POLICY = "none"
+
 
 def _message_dump(message: ModelMessage) -> dict:
     return message.model_dump(exclude_none=True)
@@ -418,6 +423,102 @@ class ModelRouterService:
             )
         return provider_row
 
+    def _route_policy_for(self, provider_row: ModelProvider | None, provider_id: str | None) -> str:
+        provider_settings = provider_row.settings if provider_row else {}
+        configured = str((provider_settings or {}).get("route_policy", "")).strip()
+        if configured:
+            return configured
+        return EXPLICIT_ROUTE_POLICY if provider_id else DEFAULT_ROUTE_POLICY
+
+    def _fallback_policy_for(self, provider_row: ModelProvider | None) -> str:
+        provider_settings = provider_row.settings if provider_row else {}
+        configured = str((provider_settings or {}).get("fallback_policy", "")).strip()
+        return configured or DEFAULT_FALLBACK_POLICY
+
+    def _fallback_available(self, provider_row: ModelProvider | None, provider: BaseModelProvider) -> bool:
+        return self._fallback_policy_for(provider_row) != NO_FALLBACK_POLICY and not provider.is_mock_transport
+
+    def _provider_attempt_label(
+        self,
+        provider_row: ModelProvider | None,
+        provider: BaseModelProvider,
+    ) -> str:
+        if provider_row:
+            return f"{provider_row.provider_type.value}:{provider_row.name}"
+        return f"{provider.provider_name}:{provider.name}"
+
+    def _classify_provider_error(self, exc: Exception) -> str:
+        if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+            return "timeout"
+        if isinstance(exc, httpx.HTTPStatusError):
+            status_code = exc.response.status_code
+            if status_code in {401, 403}:
+                return "auth_failed"
+            if status_code == 429:
+                return "rate_limited"
+            if status_code >= 500:
+                return "provider_unavailable"
+            return "provider_http_error"
+        if isinstance(exc, httpx.RequestError):
+            return "provider_unreachable"
+        if isinstance(exc, ValueError):
+            return "invalid_provider"
+        return "provider_error"
+
+    def _with_route_metadata(
+        self,
+        response: ModelCompletionResponse,
+        *,
+        route_policy: str,
+        fallback_policy: str,
+        attempted_providers: list[str],
+        fallback_used: bool = False,
+        fallback_reason: str | None = None,
+    ) -> ModelCompletionResponse:
+        return response.model_copy(
+            update={
+                "route_policy": route_policy,
+                "fallback_policy": fallback_policy,
+                "fallback_used": fallback_used,
+                "fallback_reason": fallback_reason,
+                "attempted_providers": attempted_providers,
+            }
+        )
+
+    def _fallback_completion(
+        self,
+        request: ModelCompletionRequest,
+        *,
+        provider_row: ModelProvider | None,
+        provider: BaseModelProvider,
+        route_policy: str,
+        fallback_policy: str,
+        attempted_providers: list[str],
+        reason: str,
+        error: str,
+    ) -> ModelCompletionResponse:
+        return ModelCompletionResponse(
+            content=(
+                f"{provider.provider_name} provider failed with {reason}. "
+                "This is a local mock fallback response for MVP testing."
+            ),
+            model=request.model or provider.model_name,
+            provider=provider.provider_name,
+            finish_reason="mock",
+            usage={
+                "mode": "router_mock_fallback",
+                "reason": reason,
+                "error": error,
+                "provider_id": str(provider_row.id) if provider_row else None,
+                "provider_name": provider.name,
+            },
+            route_policy=route_policy,
+            fallback_policy=fallback_policy,
+            fallback_used=True,
+            fallback_reason=reason,
+            attempted_providers=attempted_providers,
+        )
+
     def _resolve_api_key(self, provider_row: ModelProvider | None) -> str:
         if not provider_row:
             return settings.deepseek_api_key
@@ -492,13 +593,68 @@ class ModelRouterService:
         )
 
     async def complete(self, request: ModelCompletionRequest) -> ModelCompletionResponse:
-        provider = self.resolve_provider(str(request.provider_id) if request.provider_id else None)
-        return await provider.complete(request)
+        provider_id = str(request.provider_id) if request.provider_id else None
+        provider_row = self._select_provider_row(provider_id)
+        provider = self._provider_from_row(provider_row) if provider_row else self.resolve_provider(None)
+        route_policy = self._route_policy_for(provider_row, provider_id)
+        fallback_policy = self._fallback_policy_for(provider_row)
+        attempted_providers = [self._provider_attempt_label(provider_row, provider)]
+
+        try:
+            completion = await provider.complete(request)
+        except Exception as exc:
+            reason = self._classify_provider_error(exc)
+            if fallback_policy == NO_FALLBACK_POLICY:
+                raise
+            return self._fallback_completion(
+                request,
+                provider_row=provider_row,
+                provider=provider,
+                route_policy=route_policy,
+                fallback_policy=fallback_policy,
+                attempted_providers=attempted_providers,
+                reason=reason,
+                error=str(exc),
+            )
+
+        fallback_used = completion.finish_reason == "mock"
+        fallback_reason = None
+        if fallback_used:
+            fallback_reason = "api_key_missing" if provider.requires_api_key and not provider.api_key else "provider_mock"
+        return self._with_route_metadata(
+            completion,
+            route_policy=route_policy,
+            fallback_policy=fallback_policy,
+            attempted_providers=attempted_providers,
+            fallback_used=fallback_used,
+            fallback_reason=fallback_reason,
+        )
 
     async def stream(self, request: ModelCompletionRequest) -> AsyncIterator[str]:
-        provider = self.resolve_provider(str(request.provider_id) if request.provider_id else None)
-        async for chunk in provider.stream(request):
-            yield chunk
+        provider_id = str(request.provider_id) if request.provider_id else None
+        provider_row = self._select_provider_row(provider_id)
+        provider = self._provider_from_row(provider_row) if provider_row else self.resolve_provider(None)
+        route_policy = self._route_policy_for(provider_row, provider_id)
+        fallback_policy = self._fallback_policy_for(provider_row)
+        attempted_providers = [self._provider_attempt_label(provider_row, provider)]
+
+        try:
+            async for chunk in provider.stream(request):
+                yield chunk
+        except Exception as exc:
+            if fallback_policy == NO_FALLBACK_POLICY:
+                raise
+            fallback = self._fallback_completion(
+                request,
+                provider_row=provider_row,
+                provider=provider,
+                route_policy=route_policy,
+                fallback_policy=fallback_policy,
+                attempted_providers=attempted_providers,
+                reason=self._classify_provider_error(exc),
+                error=str(exc),
+            )
+            yield fallback.content
 
     async def validate(self, request: ModelProviderValidationRequest) -> ModelProviderValidationResponse:
         provider_row = self._select_provider_row(str(request.provider_id) if request.provider_id else None)
@@ -516,6 +672,12 @@ class ModelRouterService:
                 base_url=provider.base_url,
                 api_key_configured=False,
                 mode="mock",
+                health_status="skipped",
+                route_policy=self._route_policy_for(
+                    provider_row, str(request.provider_id) if request.provider_id else None
+                ),
+                fallback_policy=self._fallback_policy_for(provider_row),
+                fallback_available=self._fallback_available(provider_row, provider),
                 completion_ok=False,
                 stream_ok=False,
                 tool_call_ok=False,
@@ -617,6 +779,12 @@ class ModelRouterService:
                 base_url=provider.base_url,
                 api_key_configured=api_key_configured,
                 mode="live",
+                health_status="healthy" if completion_ok else "degraded",
+                route_policy=self._route_policy_for(
+                    provider_row, str(request.provider_id) if request.provider_id else None
+                ),
+                fallback_policy=self._fallback_policy_for(provider_row),
+                fallback_available=self._fallback_available(provider_row, provider),
                 completion_ok=completion_ok,
                 stream_ok=stream_ok if request.check_stream else False,
                 tool_call_ok=tool_call_ok if request.check_tool_call else False,
@@ -636,6 +804,12 @@ class ModelRouterService:
                 base_url=provider.base_url,
                 api_key_configured=api_key_configured,
                 mode="live",
+                health_status="unhealthy",
+                route_policy=self._route_policy_for(
+                    provider_row, str(request.provider_id) if request.provider_id else None
+                ),
+                fallback_policy=self._fallback_policy_for(provider_row),
+                fallback_available=self._fallback_available(provider_row, provider),
                 completion_ok=completion_ok,
                 stream_ok=stream_ok,
                 tool_call_ok=tool_call_ok,

@@ -232,6 +232,10 @@ class ModelProviderValidationResponse(BaseModel):
     base_url: str
     api_key_configured: bool
     mode: str
+    health_status: str = "unknown"
+    route_policy: str = "default"
+    fallback_policy: str = "mock_on_error"
+    fallback_available: bool = False
     completion_ok: bool
     stream_ok: bool
     tool_call_ok: bool
@@ -306,6 +310,11 @@ class ModelCompletionResponse(BaseModel):
     finish_reason: str = "stop"
     tool_calls: list[ModelToolCall] = Field(default_factory=list)
     usage: dict[str, Any] = Field(default_factory=dict)
+    route_policy: str = "default"
+    fallback_policy: str = "mock_on_error"
+    fallback_used: bool = False
+    fallback_reason: str | None = None
+    attempted_providers: list[str] = Field(default_factory=list)
 
 
 ModelProviderValidationResponse.model_rebuild()

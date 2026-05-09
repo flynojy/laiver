@@ -33,6 +33,11 @@ class AgentDebugInfo(BaseModel):
     provider_name: str
     model_name: str
     model_mode: str
+    route_policy: str = "default"
+    fallback_policy: str = "mock_on_error"
+    provider_fallback_used: bool = False
+    provider_fallback_reason: str | None = None
+    attempted_providers: list[str] = Field(default_factory=list)
     persona_id: uuid.UUID | None = None
     persona_name: str | None = None
     memory_write_count: int

@@ -1729,9 +1729,75 @@ class IntegrationTestCase(unittest.TestCase):
 
         self.assertEqual(payload["provider_type"], "openai_compatible")
         self.assertEqual(payload["mode"], "live")
+        self.assertEqual(payload["health_status"], "healthy")
+        self.assertEqual(payload["route_policy"], "explicit_provider")
+        self.assertEqual(payload["fallback_policy"], "mock_on_error")
+        self.assertFalse(payload["fallback_available"])
         self.assertTrue(payload["completion_ok"])
         self.assertTrue(payload["stream_ok"])
         self.assertTrue(payload["tool_call_ok"])
+
+    def test_model_provider_validation_reports_unhealthy_endpoint(self) -> None:
+        bootstrap_runtime(self.client)
+        provider = create_model_provider(
+            self.client,
+            name="Unreachable OpenAI Compatible Test",
+            provider_type="openai_compatible",
+            base_url="http://127.0.0.1:9",
+            model_name="gpt-test",
+            api_key_ref=None,
+            is_default=True,
+            settings={"supports_streaming": False, "supports_tool_calling": False},
+        )
+
+        response = self.client.post(
+            "/api/v1/model-providers/validate",
+            json={"provider_id": provider["id"], "check_stream": False, "check_tool_call": False},
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        self.assertEqual(payload["provider_type"], "openai_compatible")
+        self.assertEqual(payload["mode"], "live")
+        self.assertEqual(payload["health_status"], "unhealthy")
+        self.assertEqual(payload["route_policy"], "explicit_provider")
+        self.assertEqual(payload["fallback_policy"], "mock_on_error")
+        self.assertTrue(payload["fallback_available"])
+        self.assertFalse(payload["completion_ok"])
+        self.assertIn("connect", payload["error"].lower())
+
+    def test_model_provider_complete_falls_back_on_unreachable_endpoint(self) -> None:
+        bootstrap_runtime(self.client)
+        provider = create_model_provider(
+            self.client,
+            name="Unreachable OpenAI Compatible Test",
+            provider_type="openai_compatible",
+            base_url="http://127.0.0.1:9",
+            model_name="gpt-test",
+            api_key_ref=None,
+            is_default=True,
+            settings={"supports_streaming": False, "supports_tool_calling": False},
+        )
+
+        response = self.client.post(
+            "/api/v1/model-providers/complete",
+            json={
+                "provider_id": provider["id"],
+                "messages": [{"role": "user", "content": "This should fall back."}],
+                "temperature": 0,
+                "max_tokens": 32,
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        self.assertEqual(payload["provider"], "openai_compatible")
+        self.assertEqual(payload["finish_reason"], "mock")
+        self.assertTrue(payload["fallback_used"])
+        self.assertEqual(payload["fallback_reason"], "provider_unreachable")
+        self.assertEqual(payload["route_policy"], "explicit_provider")
+        self.assertEqual(payload["fallback_policy"], "mock_on_error")
+        self.assertEqual(payload["attempted_providers"], ["openai_compatible:Unreachable OpenAI Compatible Test"])
 
     def test_agent_can_use_mock_openai_compatible_provider_as_default(self) -> None:
         user_id, _, _, persona = create_full_state(self.client)
@@ -1764,6 +1830,44 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertEqual(provider["provider_type"], "openai_compatible")
         self.assertEqual(payload["debug"]["provider_name"], "openai_compatible")
         self.assertEqual(payload["debug"]["model_mode"], "live")
+        self.assertEqual(payload["debug"]["route_policy"], "default_enabled_provider")
+        self.assertEqual(payload["debug"]["fallback_policy"], "mock_on_error")
+        self.assertFalse(payload["debug"]["provider_fallback_used"])
+
+    def test_agent_falls_back_when_default_provider_is_unreachable(self) -> None:
+        user_id, _, _, persona = create_full_state(self.client)
+        create_model_provider(
+            self.client,
+            name="Unreachable OpenAI Compatible Test",
+            provider_type="openai_compatible",
+            base_url="http://127.0.0.1:9",
+            model_name="gpt-test",
+            api_key_ref=None,
+            is_default=True,
+            settings={"supports_streaming": False, "supports_tool_calling": False},
+        )
+
+        response = self.client.post(
+            "/api/v1/agent/respond",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["persona"]["id"],
+                "message": "Use the configured default provider if possible.",
+                "controls": {
+                    "skills_enabled": False,
+                    "memory_write_enabled": False,
+                },
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        self.assertEqual(payload["debug"]["provider_name"], "openai_compatible")
+        self.assertEqual(payload["debug"]["model_mode"], "mock")
+        self.assertEqual(payload["debug"]["route_policy"], "default_enabled_provider")
+        self.assertTrue(payload["debug"]["provider_fallback_used"])
+        self.assertEqual(payload["debug"]["provider_fallback_reason"], "provider_unreachable")
+        self.assertEqual(payload["debug"]["fallback_status"], "mock_provider_default")
 
     def test_model_provider_validation_skips_cleanly_without_api_key(self) -> None:
         bootstrap_runtime(self.client)
@@ -1772,6 +1876,9 @@ class IntegrationTestCase(unittest.TestCase):
         payload = response.json()
 
         self.assertEqual(payload["mode"], "mock")
+        self.assertEqual(payload["health_status"], "skipped")
+        self.assertEqual(payload["fallback_policy"], "mock_on_error")
+        self.assertTrue(payload["fallback_available"])
         self.assertFalse(payload["api_key_configured"])
         self.assertFalse(payload["completion_ok"])
         self.assertIn("skipped", payload["error"].lower())

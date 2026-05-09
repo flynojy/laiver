@@ -409,6 +409,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     <Badge>{validation.mode}</Badge>
+                    <Badge>{validation.health_status}</Badge>
                     <Badge>{validation.provider_type}</Badge>
                     <ValidationBadge label="completion" ok={validation.completion_ok} />
                     <ValidationBadge label="stream" ok={validation.stream_ok} />
@@ -419,6 +420,10 @@ export default function SettingsPage() {
                   </p>
                   <p className="text-xs text-[var(--muted-foreground)]">
                     API key configured: {validation.api_key_configured ? "yes" : "no"}
+                  </p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Route: {validation.route_policy} · Fallback: {validation.fallback_policy}
+                    {validation.fallback_available ? " available" : " unavailable"}
                   </p>
                   <div className="space-y-3 text-xs text-[var(--muted-foreground)]">
                     <div>

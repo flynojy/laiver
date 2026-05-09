@@ -382,6 +382,10 @@ export interface ModelProviderValidationResult {
   base_url: string;
   api_key_configured: boolean;
   mode: string;
+  health_status: string;
+  route_policy: string;
+  fallback_policy: string;
+  fallback_available: boolean;
   completion_ok: boolean;
   stream_ok: boolean;
   tool_call_ok: boolean;
@@ -491,6 +495,11 @@ export interface AgentDebugInfo {
   provider_name: string;
   model_name: string;
   model_mode: string;
+  route_policy: string;
+  fallback_policy: string;
+  provider_fallback_used: boolean;
+  provider_fallback_reason?: string | null;
+  attempted_providers: string[];
   persona_id?: UUID | null;
   persona_name?: string | null;
   memory_write_count: number;

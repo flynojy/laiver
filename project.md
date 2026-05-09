@@ -402,3 +402,11 @@ python scripts/run_mvp_regression.py
 - 本轮验证：使用 `PATH=/opt/homebrew/opt/node@22/bin:.venv/bin:$PATH npm run check` 跑完整基线，通过 API lint、48 个后端集成测试、7 个 memory regression、Web typecheck 和 Web production build。
 - 环境备注：全局 Node 仍是 v25.9.0；验证时需要显式把 Node 22 和 `.venv/bin` 放到 PATH 前。
 - 下一步建议：开始 P1 任务，优先强化 provider health check / fallback policy / route policy，或继续扩展 memory trace 与 exact/full-text regression。
+
+### 2026-05-09：强化模型路由健康检查与降级可解释性
+
+- 本轮完成：`ModelRouterService` 增加 route policy、fallback policy、provider failure classification、attempted providers 和 mock fallback metadata；真实 provider 不可达时 completion/Agent 路径会返回可解释 mock fallback，而不是直接 500。
+- 本轮完成：`/model-providers/validate` 增加 `health_status`、`fallback_available`、`route_policy`、`fallback_policy`，Settings 页面同步展示健康和降级状态。
+- 本轮完成：Agent debug 增加 provider fallback 信息，方便 Chat / Connector trace 判断是否由模型不可达触发降级。
+- 本轮测试：新增 provider validation unhealthy、completion fallback、Agent default provider fallback 等集成测试；完整 `PATH=/opt/homebrew/opt/node@22/bin:.venv/bin:$PATH npm run check` 通过，当前集成测试 51 个、memory regression 7 个。
+- 下一步建议：继续细化 fallback policy 的可配置行为，例如 `none` 策略的 API 错误语义、备用 provider 链路、多 provider health cache，以及真实 DeepSeek/Ollama/Local Adapter live check。
