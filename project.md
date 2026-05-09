@@ -271,6 +271,7 @@ Training 链路当前支持：
 - provider health check 仍需加强。
 - fallback policy 和 route policy 仍偏 MVP。
 - 真实 provider 异常、超时、限流、无 key、mock fallback 的行为需要更明确的策略和测试。
+- 需要补一个类似 switchcc 的模型切换界面，用于一键查看、验证、切换当前默认模型 provider，并清楚展示当前 provider、健康状态、fallback 状态和切换结果。
 - Local Adapter runtime 已有 warm/evict/timeout guard，但真实模型加载和资源管理还需在目标机器上验证。
 
 ### P1：Fine-tuning 效果验证
@@ -410,3 +411,10 @@ python scripts/run_mvp_regression.py
 - 本轮完成：Agent debug 增加 provider fallback 信息，方便 Chat / Connector trace 判断是否由模型不可达触发降级。
 - 本轮测试：新增 provider validation unhealthy、completion fallback、Agent default provider fallback 等集成测试；完整 `PATH=/opt/homebrew/opt/node@22/bin:.venv/bin:$PATH npm run check` 通过，当前集成测试 51 个、memory regression 7 个。
 - 下一步建议：继续细化 fallback policy 的可配置行为，例如 `none` 策略的 API 错误语义、备用 provider 链路、多 provider health cache，以及真实 DeepSeek/Ollama/Local Adapter live check。
+
+### 2026-05-09：配置本地 DeepSeek 测试 Key 并记录模型切换界面需求
+
+- 本轮完成：创建本地 `.env` 并配置 `DEEPSEEK_API_KEY`；`.env` 已被 `.gitignore` 忽略，不应提交密钥。
+- 本轮验证：通过 `get_settings()` 确认 `deepseek_key_configured=True`，DeepSeek base URL 为 `https://api.deepseek.com`，模型为 `deepseek-chat`。
+- 本轮记录：后续需要做类似 switchcc 的模型切换界面，支持一键切换默认 provider、验证 provider 健康状态、显示 fallback/route 信息，并让用户明确当前 Chat 使用哪个模型。
+- 下一步建议：先用 `/api/v1/model-providers/bootstrap` 创建 DeepSeek 默认 provider，再调用 `/api/v1/model-providers/validate` 做 live check；随后实现模型切换 UI。
