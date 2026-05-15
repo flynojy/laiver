@@ -24,9 +24,9 @@ import type {
   UUID
 } from "@agent/shared";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -328,6 +328,7 @@ export async function respondAgent(payload: {
   user_id: UUID;
   conversation_id?: UUID | null;
   persona_id?: UUID | null;
+  provider_id?: UUID | null;
   message: string;
   controls?: ConversationControls;
 }) {

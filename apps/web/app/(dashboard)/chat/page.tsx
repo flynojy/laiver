@@ -3,34 +3,35 @@
 import { useEffect, useState } from "react";
 import { Loader2, SendHorizontal } from "lucide-react";
 
-import type { AgentChatResponse, ConversationControls, MemoryRecord, PersonaCard } from "@agent/shared";
+import type {
+  ConversationControls,
+  ModelProviderConfig,
+  PersonaCard,
+  UUID
+} from "@agent/shared";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { defaultConversationControls, normalizeConversationControls, toChatRunViewModel } from "@/features/chat/mappers";
+import type { ChatMemoryItemViewModel, ChatRunViewModel } from "@/features/chat/view-models";
 import {
   bootstrapModelProvider,
   bootstrapUser,
   getConversation,
   listConversations,
+  listModelProviders,
   listPersonas,
   respondAgent,
   seedSkills,
   updateConversation,
   type ConversationDetail,
   type ConversationSummary
-} from "@/lib/api";
+} from "@/features/chat/client";
 
-function defaultControls(): ConversationControls {
-  return {
-    skills_enabled: true,
-    memory_write_enabled: true
-  };
-}
-
-function MemoryList({ memories }: { memories: MemoryRecord[] }) {
+function MemoryList({ memories }: { memories: ChatMemoryItemViewModel[] }) {
   if (memories.length === 0) {
     return <p className="text-sm text-[var(--muted-foreground)]">No items.</p>;
   }
@@ -40,11 +41,11 @@ function MemoryList({ memories }: { memories: MemoryRecord[] }) {
       {memories.map((memory) => (
         <div key={memory.id} className="rounded-2xl border border-[color:var(--border)] bg-[#fffdf9] p-3">
           <div className="flex flex-wrap gap-2">
-            <Badge>{memory.memory_type}</Badge>
-            <Badge>{String(memory.metadata?.memory_label ?? "unknown")}</Badge>
-            <Badge>{String(memory.metadata?.state ?? "active")}</Badge>
-            <Badge>importance {memory.importance_score}</Badge>
-            <Badge>confidence {memory.confidence_score}</Badge>
+            <Badge>{memory.type}</Badge>
+            <Badge>{memory.label}</Badge>
+            <Badge>{memory.state}</Badge>
+            <Badge>importance {memory.importance}</Badge>
+            <Badge>confidence {memory.confidence}</Badge>
           </div>
           <p className="mt-2 text-sm leading-6">{memory.content}</p>
         </div>
@@ -57,14 +58,16 @@ export default function ChatPage() {
   const [userId, setUserId] = useState("");
   const [personas, setPersonas] = useState<PersonaCard[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState("");
-  const [controls, setControls] = useState<ConversationControls>(defaultControls());
+  const [providers, setProviders] = useState<ModelProviderConfig[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<UUID | "">("");
+  const [controls, setControls] = useState<ConversationControls>(defaultConversationControls());
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConversation, setActiveConversation] = useState<ConversationDetail | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
-  const [lastRun, setLastRun] = useState<AgentChatResponse | null>(null);
+  const [lastRun, setLastRun] = useState<ChatRunViewModel | null>(null);
 
   async function loadConversation(conversationId: string, preferredPersonaId?: string | null) {
     const detail = await getConversation(conversationId);
@@ -74,11 +77,7 @@ export default function ChatPage() {
     } else if (detail.conversation.persona_id) {
       setSelectedPersonaId(detail.conversation.persona_id);
     }
-    const nextControls = (detail.conversation.metadata?.controls as ConversationControls | undefined) ?? defaultControls();
-    setControls({
-      skills_enabled: nextControls.skills_enabled ?? true,
-      memory_write_enabled: nextControls.memory_write_enabled ?? true
-    });
+    setControls(normalizeConversationControls(detail.conversation.metadata?.controls));
   }
 
   async function refreshConversations(nextConversationId?: string, preferredPersonaId?: string | null) {
@@ -95,14 +94,13 @@ export default function ChatPage() {
       const user = await bootstrapUser();
       setUserId(user.user.id);
 
-      const [personaRows] = await Promise.all([
-        listPersonas(),
-        bootstrapModelProvider(),
-        seedSkills()
-      ]);
+      await bootstrapModelProvider();
+      const [personaRows, providerRows] = await Promise.all([listPersonas(), listModelProviders(), seedSkills()]);
 
       setPersonas(personaRows);
       setSelectedPersonaId(personaRows.find((item) => item.is_default)?.id ?? personaRows[0]?.id ?? "");
+      setProviders(providerRows);
+      setSelectedProviderId(providerRows.find((item) => item.is_default)?.id ?? providerRows[0]?.id ?? "");
       await refreshConversations();
     }
 
@@ -114,6 +112,11 @@ export default function ChatPage() {
   const currentPersona =
     lastRun?.persona ??
     personas.find((persona) => persona.id === (selectedPersonaId || activeConversation?.conversation.persona_id)) ??
+    null;
+  const currentProvider =
+    providers.find((provider) => provider.id === (selectedProviderId || undefined)) ??
+    providers.find((provider) => provider.is_default) ??
+    providers[0] ??
     null;
 
   async function persistConversationState(nextPersonaId: string, nextControls: ConversationControls) {
@@ -138,12 +141,14 @@ export default function ChatPage() {
         user_id: userId,
         conversation_id: activeConversation?.conversation.id,
         persona_id: selectedPersonaId || undefined,
+        provider_id: selectedProviderId || undefined,
         message: draft,
         controls
       });
-      setLastRun(result);
+      const runView = toChatRunViewModel(result);
+      setLastRun(runView);
       setDraft("");
-      await refreshConversations(result.conversation_id, result.debug.persona_id ?? selectedPersonaId);
+      await refreshConversations(runView.conversationId, runView.personaId ?? selectedPersonaId);
       setStatus("Agent responded. Use the debug panel to inspect controls, explanation, memory writes, and skill grounding.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Message send failed.");
@@ -168,7 +173,7 @@ export default function ChatPage() {
         <Card className="bg-white/88">
           <CardHeader>
             <CardTitle>Conversation Controls</CardTitle>
-            <CardDescription>Set persona and runtime switches before sending the next turn.</CardDescription>
+            <CardDescription>Set persona, provider, and runtime switches before sending the next turn.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -191,7 +196,26 @@ export default function ChatPage() {
                     {persona.name}
                   </option>
                 ))}
+                </select>
+              </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Model Provider</label>
+              <select
+                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                value={selectedProviderId}
+                onChange={(event) => setSelectedProviderId(event.target.value as UUID | "")}
+              >
+                <option value="">Default provider</option>
+                {providers.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name} ({provider.provider_type})
+                  </option>
+                ))}
               </select>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Current default: {currentProvider ? `${currentProvider.name} (${currentProvider.provider_type})` : "none"}
+              </p>
             </div>
 
             <div className="space-y-3 rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
@@ -240,7 +264,7 @@ export default function ChatPage() {
               onClick={() => {
                 setActiveConversation(null);
                 setLastRun(null);
-                setControls(defaultControls());
+                setControls(defaultConversationControls());
                 setStatus("Switched to new conversation mode.");
               }}
             >
@@ -333,7 +357,7 @@ export default function ChatPage() {
         <Card className="bg-white/88">
           <CardHeader>
             <CardTitle>Debug Panel</CardTitle>
-            <CardDescription>This panel consumes the shared `AgentChatResponse.debug` schema directly.</CardDescription>
+            <CardDescription>This panel is rendered from the Chat feature view model, not raw backend debug fields.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-2">
@@ -358,10 +382,10 @@ export default function ChatPage() {
               <label className="text-sm font-medium">Runtime Controls</label>
               {lastRun ? (
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{lastRun.debug.skills_enabled ? "skills enabled" : "skills disabled"}</Badge>
-                  <Badge>{lastRun.debug.memory_write_enabled ? "memory write enabled" : "memory write disabled"}</Badge>
-                  <Badge>{lastRun.debug.memory_write_count > 0 ? "memory written" : "no memory write"}</Badge>
-                  <Badge>{lastRun.debug.persona_name ?? "no persona"}</Badge>
+                  <Badge>{lastRun.runtime.skillsEnabled ? "skills enabled" : "skills disabled"}</Badge>
+                  <Badge>{lastRun.runtime.memoryWriteEnabled ? "memory write enabled" : "memory write disabled"}</Badge>
+                  <Badge>{lastRun.runtime.memoryWritten ? "memory written" : "no memory write"}</Badge>
+                  <Badge>{lastRun.runtime.personaName}</Badge>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -375,15 +399,21 @@ export default function ChatPage() {
               <label className="text-sm font-medium">Provider + Model</label>
               {lastRun ? (
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{lastRun.debug.provider_name}</Badge>
-                  <Badge>{lastRun.debug.model_name}</Badge>
-                  <Badge>{lastRun.debug.model_mode}</Badge>
-                  <Badge>route {lastRun.debug.memory_query_route}</Badge>
-                  <Badge>{lastRun.debug.fallback_status}</Badge>
-                  <Badge>{lastRun.debug.trace_id}</Badge>
+                  <Badge>{lastRun.provider.providerName}</Badge>
+                  <Badge>{lastRun.provider.modelName}</Badge>
+                  <Badge>{lastRun.provider.modelMode}</Badge>
+                  {lastRun.provider.modelThinkLabel ? <Badge>{lastRun.provider.modelThinkLabel}</Badge> : null}
+                  {lastRun.provider.modelThinkGate ? <Badge>{lastRun.provider.modelThinkGate}</Badge> : null}
+                  <Badge>route {lastRun.provider.memoryRoute}</Badge>
+                  <Badge>{lastRun.provider.fallbackStatus}</Badge>
+                  <Badge>{lastRun.provider.traceId}</Badge>
                 </div>
               ) : (
-                <p className="text-sm text-[var(--muted-foreground)]">Send a message to populate debug info.</p>
+                <div className="flex flex-wrap gap-2">
+                  {currentProvider ? <Badge>{currentProvider.provider_type}</Badge> : <Badge>no provider</Badge>}
+                  {currentProvider ? <Badge>{currentProvider.name}</Badge> : null}
+                  <Badge>{selectedProviderId ? "explicit" : "default route"}</Badge>
+                </div>
               )}
             </div>
 
@@ -392,13 +422,13 @@ export default function ChatPage() {
               {lastRun ? (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{lastRun.debug.compression_active ? "compression active" : "full short history"}</Badge>
-                    <Badge>{lastRun.debug.summarized_message_count} summarized</Badge>
-                    <Badge>{lastRun.debug.recent_message_count} recent kept</Badge>
+                    <Badge>{lastRun.compression.active ? "compression active" : "full short history"}</Badge>
+                    <Badge>{lastRun.compression.summarizedMessageCount} summarized</Badge>
+                    <Badge>{lastRun.compression.recentMessageCount} recent kept</Badge>
                   </div>
-                  {lastRun.debug.conversation_summary ? (
+                  {lastRun.compression.summary ? (
                     <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
-                      {lastRun.debug.conversation_summary}
+                      {lastRun.compression.summary}
                     </pre>
                   ) : (
                     <p className="text-sm text-[var(--muted-foreground)]">No summary injected for the last run.</p>
@@ -412,9 +442,9 @@ export default function ChatPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Skills Used</label>
               {lastRun ? (
-                lastRun.debug.skills_used.length > 0 ? (
+                lastRun.skillsUsed.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {lastRun.debug.skills_used.map((skill) => (
+                    {lastRun.skillsUsed.map((skill) => (
                       <Badge key={skill}>{skill}</Badge>
                     ))}
                   </div>
@@ -428,15 +458,15 @@ export default function ChatPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Memories Used In Answer</label>
-              {lastRun ? <MemoryList memories={lastRun.debug.explanation.memories_used} /> : <p className="text-sm text-[var(--muted-foreground)]">No run yet.</p>}
+              {lastRun ? <MemoryList memories={lastRun.explanation.memoriesUsed} /> : <p className="text-sm text-[var(--muted-foreground)]">No run yet.</p>}
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Persona Fields Used</label>
               {lastRun ? (
-                lastRun.debug.explanation.persona_fields_used.length > 0 ? (
+                lastRun.explanation.personaFieldsUsed.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {lastRun.debug.explanation.persona_fields_used.map((field) => (
+                    {lastRun.explanation.personaFieldsUsed.map((field) => (
                       <Badge key={field}>{field}</Badge>
                     ))}
                   </div>
@@ -451,9 +481,9 @@ export default function ChatPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Skill Outputs Referenced</label>
               {lastRun ? (
-                lastRun.debug.explanation.skill_outputs_used.length > 0 ? (
+                lastRun.explanation.skillOutputsUsed.length > 0 ? (
                   <div className="space-y-2">
-                    {lastRun.debug.explanation.skill_outputs_used.map((item) => (
+                    {lastRun.explanation.skillOutputsUsed.map((item) => (
                       <div key={item} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
                         {item}
                       </div>
@@ -470,17 +500,17 @@ export default function ChatPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Skill Invocation Details</label>
               {lastRun ? (
-                lastRun.debug.skill_invocations.length > 0 ? (
+                lastRun.skillInvocations.length > 0 ? (
                   <div className="space-y-3">
-                    {lastRun.debug.skill_invocations.map((invocation) => (
-                      <div key={invocation.invocation_id} className="rounded-2xl border border-[color:var(--border)] bg-[#fffdf9] p-3">
+                    {lastRun.skillInvocations.map((invocation) => (
+                      <div key={invocation.id} className="rounded-2xl border border-[color:var(--border)] bg-[#fffdf9] p-3">
                         <div className="flex flex-wrap gap-2">
-                          <Badge>{invocation.skill_slug}</Badge>
-                          <Badge>{invocation.tool_name}</Badge>
+                          <Badge>{invocation.skillSlug}</Badge>
+                          <Badge>{invocation.toolName}</Badge>
                           <Badge>{invocation.status}</Badge>
                         </div>
                         <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
-                          {JSON.stringify(invocation.output, null, 2)}
+                          {invocation.outputJson}
                         </pre>
                         {invocation.error ? (
                           <p className="mt-2 text-xs text-red-600">{invocation.error}</p>
@@ -498,7 +528,7 @@ export default function ChatPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Memory Hits</label>
-              {lastRun ? <MemoryList memories={lastRun.debug.memory_hits} /> : <p className="text-sm text-[var(--muted-foreground)]">No run yet.</p>}
+              {lastRun ? <MemoryList memories={lastRun.memoryHits} /> : <p className="text-sm text-[var(--muted-foreground)]">No run yet.</p>}
             </div>
 
             <div className="space-y-2">
@@ -506,10 +536,10 @@ export default function ChatPage() {
               {lastRun ? (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{lastRun.debug.memory_write_count > 0 ? "YES" : "NO"}</Badge>
-                    <Badge>{lastRun.debug.memory_write_count} writes</Badge>
+                    <Badge>{lastRun.runtime.memoryWritten ? "YES" : "NO"}</Badge>
+                    <Badge>{lastRun.runtime.memoryWriteCount} writes</Badge>
                   </div>
-                  <MemoryList memories={lastRun.debug.memory_writes} />
+                  <MemoryList memories={lastRun.memoryWrites} />
                 </>
               ) : (
                 <p className="text-sm text-[var(--muted-foreground)]">No run yet.</p>

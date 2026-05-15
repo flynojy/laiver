@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
@@ -10,6 +11,7 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 
+import httpx
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
@@ -620,7 +622,7 @@ class IntegrationTestCase(unittest.TestCase):
         payload = response.json()
         self.assertIn("task-extractor", payload["debug"]["skills_used"])
         self.assertEqual(payload["debug"]["fallback_status"], "mock_provider_grounded")
-        self.assertIn("structured action items", payload["response"].lower())
+        self.assertIn("待办", payload["response"])
         self.assertIn("follow up with alice today", payload["response"].lower())
 
     def test_skill_failure_falls_back_cleanly(self) -> None:
@@ -638,7 +640,7 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertIn("task-extractor", payload["debug"]["skills_used"])
         self.assertEqual(payload["debug"]["fallback_status"], "skill_error_fallback")
         self.assertTrue(any(item["status"] == "error" for item in payload["debug"]["skill_invocations"]))
-        self.assertIn("skills failed", payload["response"].lower())
+        self.assertIn("工具调用失败", payload["response"])
 
     def test_memories_list_endpoint(self) -> None:
         user_id, _, _, persona = create_full_state(self.client)
@@ -1710,6 +1712,114 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertTrue(openai_provider["is_default"])
         self.assertFalse(ollama_provider["is_default"])
 
+    def test_ollama_provider_options_use_request_and_provider_settings(self) -> None:
+        from app.schemas.runtime import ModelCompletionRequest, ModelMessage
+        from app.services.model_router import _ollama_options
+
+        request = ModelCompletionRequest(
+            messages=[ModelMessage(role="user", content="hello")],
+            temperature=0.2,
+            max_tokens=42,
+        )
+        options = _ollama_options(
+            request,
+            {
+                "num_ctx": 1024,
+                "num_gpu": 20,
+                "use_mmap": False,
+            },
+        )
+
+        self.assertEqual(options["temperature"], 0.2)
+        self.assertEqual(options["num_predict"], 42)
+        self.assertEqual(options["num_ctx"], 1024)
+        self.assertEqual(options["num_gpu"], 20)
+        self.assertFalse(options["use_mmap"])
+
+    def test_ollama_think_gate_defaults_fast_replies_to_false(self) -> None:
+        from app.schemas.runtime import ModelCompletionRequest, ModelMessage, ToolDefinition
+        from app.services.model_router import _ollama_think_decision, _ollama_think_enabled
+
+        fast_request = ModelCompletionRequest(
+            messages=[ModelMessage(role="user", content="hello")],
+            temperature=0.2,
+            max_tokens=42,
+        )
+        reasoning_request = ModelCompletionRequest(
+            messages=[ModelMessage(role="user", content="Please analyze this problem and compare two plans.")],
+        )
+        tool_request = ModelCompletionRequest(
+            messages=[ModelMessage(role="user", content="check status")],
+            tools=[ToolDefinition(function={"name": "echo_status", "parameters": {"type": "object"}})],
+        )
+
+        self.assertFalse(_ollama_think_enabled(fast_request, {}))
+        self.assertEqual(_ollama_think_decision(fast_request, {})["gate"], "fast_reply")
+        self.assertTrue(_ollama_think_enabled(reasoning_request, {}))
+        self.assertEqual(_ollama_think_decision(reasoning_request, {})["gate"], "need_reasoning")
+        self.assertTrue(_ollama_think_enabled(tool_request, {}))
+        self.assertEqual(_ollama_think_decision(tool_request, {})["gate"], "tool_or_memory_heavy")
+        self.assertTrue(_ollama_think_enabled(fast_request, {"think": True}))
+        self.assertFalse(_ollama_think_enabled(reasoning_request, {"think": False}))
+
+    def test_ollama_provider_sends_top_level_think_false_by_default(self) -> None:
+        from app.schemas.runtime import ModelCompletionRequest, ModelMessage
+        from app.services import model_router
+
+        captured: dict[str, object] = {}
+
+        class FakeResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "model": "qwen3:14b",
+                    "message": {"content": "ok"},
+                    "done": True,
+                    "prompt_eval_count": 1,
+                    "eval_count": 1,
+                    "total_duration": 1,
+                }
+
+        class FakeAsyncClient:
+            def __init__(self, *args, **kwargs) -> None:
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args) -> None:
+                return None
+
+            async def post(self, url, headers, json):
+                captured["url"] = url
+                captured["headers"] = headers
+                captured["payload"] = json
+                return FakeResponse()
+
+        provider = model_router.OllamaProvider(
+            name="Ollama Test",
+            model_name="qwen3:14b",
+            base_url="http://127.0.0.1:11434",
+            api_key="",
+            provider_name="ollama",
+        )
+        request = ModelCompletionRequest(messages=[ModelMessage(role="user", content="hello")])
+        original_client = model_router.httpx.AsyncClient
+        model_router.httpx.AsyncClient = FakeAsyncClient
+        try:
+            completion = asyncio.run(provider.complete(request))
+        finally:
+            model_router.httpx.AsyncClient = original_client
+
+        payload = captured["payload"]
+        self.assertIsInstance(payload, dict)
+        self.assertIs(payload["think"], False)
+        self.assertEqual(payload["model"], "qwen3:14b")
+        self.assertEqual(completion.usage["think_enabled"], False)
+        self.assertEqual(completion.usage["think_gate"], "fast_reply")
+
     def test_model_provider_validation_accepts_mock_openai_compatible_endpoint(self) -> None:
         bootstrap_runtime(self.client)
         provider = create_model_provider(
@@ -1767,7 +1877,52 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertEqual(payload["fallback_policy"], "mock_on_error")
         self.assertTrue(payload["fallback_available"])
         self.assertFalse(payload["completion_ok"])
-        self.assertIn("connect", payload["error"].lower())
+        self.assertIn(payload["error_code"], {"provider_unreachable", "provider_unavailable"})
+        self.assertTrue(payload["recommendation"])
+        self.assertTrue(payload["error"])
+
+    def test_model_provider_validation_reports_ollama_memory_guidance(self) -> None:
+        from app.services import model_router
+
+        bootstrap_runtime(self.client)
+        provider = create_model_provider(
+            self.client,
+            name="Ollama Memory Test",
+            provider_type="ollama",
+            base_url="http://127.0.0.1:11434",
+            model_name="qwen3:14b",
+            api_key_ref=None,
+            is_default=True,
+            settings={"supports_streaming": False, "supports_tool_calling": False},
+        )
+
+        async def fail_complete(self, request):
+            request.model_dump()
+            http_request = httpx.Request("POST", f"{self.base_url}/api/chat")
+            response = httpx.Response(500, text="memory layout cannot be allocated", request=http_request)
+            raise httpx.HTTPStatusError(
+                "memory layout cannot be allocated",
+                request=http_request,
+                response=response,
+            )
+
+        original_complete = model_router.OllamaProvider.complete
+        model_router.OllamaProvider.complete = fail_complete
+        try:
+            response = self.client.post(
+                "/api/v1/model-providers/validate",
+                json={"provider_id": provider["id"], "check_stream": False, "check_tool_call": False},
+            )
+            response.raise_for_status()
+            payload = response.json()
+        finally:
+            model_router.OllamaProvider.complete = original_complete
+
+        self.assertEqual(payload["provider_type"], "ollama")
+        self.assertEqual(payload["health_status"], "unhealthy")
+        self.assertEqual(payload["error_code"], "provider_unavailable")
+        self.assertIn("memory-layout", payload["recommendation"])
+        self.assertIn("WSL2/Linux", payload["recommendation"])
 
     def test_model_provider_complete_falls_back_on_unreachable_endpoint(self) -> None:
         bootstrap_runtime(self.client)
@@ -1837,6 +1992,39 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertEqual(payload["debug"]["fallback_policy"], "mock_on_error")
         self.assertFalse(payload["debug"]["provider_fallback_used"])
 
+    def test_agent_can_use_explicit_provider_id_for_chat(self) -> None:
+        user_id, _, _, persona = create_full_state(self.client)
+        provider = create_model_provider(
+            self.client,
+            name="Explicit OpenAI Compatible Test",
+            provider_type="openai_compatible",
+            base_url="mock://success/openai",
+            model_name="gpt-test",
+            api_key_ref=None,
+            is_default=False,
+            settings={"supports_streaming": True, "supports_tool_calling": True},
+        )
+
+        response = self.client.post(
+            "/api/v1/agent/respond",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["persona"]["id"],
+                "provider_id": provider["id"],
+                "message": "Switch to the explicit provider for this reply.",
+                "controls": {
+                    "skills_enabled": False,
+                    "memory_write_enabled": False,
+                },
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        self.assertEqual(payload["debug"]["provider_name"], "openai_compatible")
+        self.assertEqual(payload["debug"]["route_policy"], "explicit_provider")
+        self.assertEqual(payload["debug"]["fallback_policy"], "mock_on_error")
+
     def test_agent_falls_back_when_default_provider_is_unreachable(self) -> None:
         user_id, _, _, persona = create_full_state(self.client)
         create_model_provider(
@@ -1869,8 +2057,90 @@ class IntegrationTestCase(unittest.TestCase):
         self.assertEqual(payload["debug"]["model_mode"], "mock")
         self.assertEqual(payload["debug"]["route_policy"], "default_enabled_provider")
         self.assertTrue(payload["debug"]["provider_fallback_used"])
-        self.assertEqual(payload["debug"]["provider_fallback_reason"], "provider_unreachable")
+        self.assertIn(
+            payload["debug"]["provider_fallback_reason"],
+            {"provider_unreachable", "provider_unavailable"},
+        )
         self.assertEqual(payload["debug"]["fallback_status"], "mock_provider_default")
+        self.assertNotIn("Mock mode is active", payload["response"])
+        self.assertNotIn("Current persona focus", payload["response"])
+
+    def test_mock_default_reply_is_user_facing_chinese(self) -> None:
+        user_id, _, _, persona = create_full_state(self.client)
+        response = self.client.post(
+            "/api/v1/agent/respond",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["persona"]["id"],
+                "message": "你好",
+                "controls": {
+                    "skills_enabled": False,
+                    "memory_write_enabled": False,
+                },
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        self.assertEqual(payload["debug"]["model_mode"], "mock")
+        self.assertEqual(payload["debug"]["fallback_status"], "mock_provider_conversational")
+        self.assertIn("我", payload["response"])
+        self.assertNotIn("Mock mode is active", payload["response"])
+        self.assertNotIn("Current persona focus", payload["response"])
+        self.assertNotIn("local fallback behavior", payload["response"])
+
+    def test_mock_conversation_answers_simple_preference_followup(self) -> None:
+        user_id, _, _, persona = create_full_state(self.client)
+        first = self.client.post(
+            "/api/v1/agent/respond",
+            json={
+                "user_id": user_id,
+                "persona_id": persona["persona"]["id"],
+                "message": "你好",
+                "controls": {
+                    "skills_enabled": False,
+                    "memory_write_enabled": True,
+                },
+            },
+        )
+        first.raise_for_status()
+        conversation_id = first.json()["conversation_id"]
+
+        second = self.client.post(
+            "/api/v1/agent/respond",
+            json={
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "persona_id": persona["persona"]["id"],
+                "message": "我喜欢吃冰淇淋",
+                "controls": {
+                    "skills_enabled": False,
+                    "memory_write_enabled": True,
+                },
+            },
+        )
+        second.raise_for_status()
+        self.assertIn("冰淇淋", second.json()["response"])
+
+        third = self.client.post(
+            "/api/v1/agent/respond",
+            json={
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "persona_id": persona["persona"]["id"],
+                "message": "我喜欢吃什么呀",
+                "controls": {
+                    "skills_enabled": True,
+                    "memory_write_enabled": False,
+                },
+            },
+        )
+        third.raise_for_status()
+        payload = third.json()
+
+        self.assertEqual(payload["debug"]["fallback_status"], "mock_provider_conversational")
+        self.assertIn("冰淇淋", payload["response"])
+        self.assertNotIn("你刚才说", payload["response"])
 
     def test_model_provider_validation_skips_cleanly_without_api_key(self) -> None:
         bootstrap_runtime(self.client)
@@ -1927,7 +2197,7 @@ class IntegrationTestCase(unittest.TestCase):
                 "name": "Local Persona Tune",
                 "source_speaker": "Assistant",
                 "backend": "local_qlora",
-                "base_model": "Qwen/Qwen2.5-7B-Instruct",
+                "base_model": "Qwen/Qwen3-14B",
                 "context_window": 4,
             },
         )

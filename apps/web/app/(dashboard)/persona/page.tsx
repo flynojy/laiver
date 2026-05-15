@@ -18,19 +18,19 @@ import {
   listPersonas,
   updatePersona,
   type ImportDetail
-} from "@/lib/api";
+} from "@/features/persona/client";
+import {
+  defaultSpeakerForImport,
+  hasPersonaChanged,
+  speakerOptionsForImport,
+  toPersonaListItemViewModel,
+  toPersonaPreviewViewModel
+} from "@/features/persona/mappers";
 
 type ExtractionResult = {
   persona: PersonaCard;
   source_message_count: number;
   source_speaker?: string | null;
-};
-
-type SpeakerOption = {
-  speaker: string;
-  messageCount: number;
-  roles: string[];
-  isSelf: boolean;
 };
 
 function renderTagList(values: string[]) {
@@ -47,97 +47,11 @@ function renderTagList(values: string[]) {
   );
 }
 
-function personaSignature(persona: PersonaCard | null) {
-  if (!persona) return "";
-  return JSON.stringify({
-    name: persona.name,
-    description: persona.description ?? "",
-    tone: persona.tone,
-    verbosity: persona.verbosity,
-    common_topics: persona.common_topics ?? [],
-    common_phrases: persona.common_phrases ?? [],
-    response_style: persona.response_style ?? {},
-    relationship_style: persona.relationship_style ?? {},
-    is_default: persona.is_default
-  });
-}
-
-function renderPersonaPreview(persona: PersonaCard | null, prompt: string) {
-  if (!persona) {
-    return "No Persona selected.";
-  }
-
-  const intro =
-    persona.verbosity === "detailed"
-      ? `I would answer this in a ${persona.tone} and more detailed way.`
-      : `I would answer this in a ${persona.tone} and concise way.`;
-  const phrase = persona.common_phrases?.[0]
-    ? `Signature phrasing: ${persona.common_phrases[0]}`
-    : "No signature phrasing configured.";
-  const topics =
-    persona.common_topics?.length > 0
-      ? `Likely emphasis: ${persona.common_topics.slice(0, 3).join(", ")}.`
-      : "Likely emphasis: the current request only.";
-
-  return `${intro}\n${topics}\n${phrase}\nSample prompt: ${prompt}`;
-}
-
 function splitCsv(value: string) {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function speakerOptionsForImport(item: ImportDetail | undefined): SpeakerOption[] {
-  if (!item) return [];
-
-  const summaryStats = item.import_job.normalized_summary?.speaker_stats;
-  if (summaryStats && typeof summaryStats === "object" && !Array.isArray(summaryStats)) {
-    return Object.entries(summaryStats)
-      .map(([speaker, value]) => {
-        if (!value || typeof value !== "object") return null;
-        const candidate = value as Record<string, unknown>;
-        return {
-          speaker,
-          messageCount:
-            typeof candidate.message_count === "number"
-              ? candidate.message_count
-              : Number(candidate.message_count) || 0,
-          roles: Array.isArray(candidate.roles)
-            ? candidate.roles.filter((item): item is string => typeof item === "string")
-            : [],
-          isSelf: candidate.is_self === true
-        };
-      })
-      .filter((item): item is SpeakerOption => item !== null)
-      .sort((left, right) => right.messageCount - left.messageCount);
-  }
-
-  const fallback = new Map<string, SpeakerOption>();
-  for (const message of item.normalized_messages) {
-    const current = fallback.get(message.speaker) ?? {
-      speaker: message.speaker,
-      messageCount: 0,
-      roles: [],
-      isSelf: message.metadata?.is_self === true
-    };
-    current.messageCount += 1;
-    if (!current.roles.includes(message.role)) {
-      current.roles.push(message.role);
-    }
-    fallback.set(message.speaker, current);
-  }
-  return [...fallback.values()].sort((left, right) => right.messageCount - left.messageCount);
-}
-
-function defaultSpeakerForImport(item: ImportDetail | undefined) {
-  if (!item) return "";
-  const owner = item.import_job.normalized_summary?.conversation_owner;
-  if (typeof owner === "string" && owner.trim()) {
-    return owner;
-  }
-  return "";
 }
 
 export default function PersonaPage() {
@@ -161,6 +75,11 @@ export default function PersonaPage() {
   const speakerOptions = useMemo(
     () => speakerOptionsForImport(selectedImport),
     [selectedImport]
+  );
+  const personaListItems = useMemo(() => personas.map(toPersonaListItemViewModel), [personas]);
+  const preview = useMemo(
+    () => toPersonaPreviewViewModel(savedPersona, draftPersona, previewPrompt),
+    [draftPersona, previewPrompt, savedPersona]
   );
 
   useEffect(() => {
@@ -225,7 +144,7 @@ export default function PersonaPage() {
   useEffect(() => {
     if (!savedPersona?.id || !draftPersona?.id) return;
     if (savedPersona.id !== draftPersona.id) return;
-    if (personaSignature(savedPersona) === personaSignature(draftPersona)) return;
+    if (!hasPersonaChanged(savedPersona, draftPersona)) return;
 
     const timeout = window.setTimeout(async () => {
       try {
@@ -241,15 +160,6 @@ export default function PersonaPage() {
 
     return () => window.clearTimeout(timeout);
   }, [draftPersona, savedPersona]);
-
-  const savedPreview = useMemo(
-    () => renderPersonaPreview(savedPersona, previewPrompt),
-    [savedPersona, previewPrompt]
-  );
-  const draftPreview = useMemo(
-    () => renderPersonaPreview(draftPersona, previewPrompt),
-    [draftPersona, previewPrompt]
-  );
 
   return (
     <div className="space-y-6">
@@ -327,18 +237,19 @@ export default function PersonaPage() {
               {personas.length === 0 ? (
                 <p className="text-sm text-[var(--muted-foreground)]">No Persona records yet.</p>
               ) : (
-                personas.map((persona) => (
+                personaListItems.map((persona) => (
                   <button
                     key={persona.id}
                     className="w-full rounded-2xl border border-[color:var(--border)] bg-[#faf8f4] px-4 py-3 text-left"
                     onClick={() => {
-                      setSavedPersona(persona);
-                      setDraftPersona(persona);
+                      const selected = personas.find((item) => item.id === persona.id) ?? null;
+                      setSavedPersona(selected);
+                      setDraftPersona(selected);
                     }}
                   >
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{persona.name}</p>
-                      {persona.is_default ? <Badge>default</Badge> : null}
+                      {persona.isDefault ? <Badge>default</Badge> : null}
                     </div>
                     <p className="mt-1 text-xs text-[var(--muted-foreground)]">
                       {persona.tone} / {persona.verbosity}
@@ -506,11 +417,11 @@ export default function PersonaPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Saved Persona Preview</Label>
-                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{savedPreview}</pre>
+                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{preview.savedPreview}</pre>
                 </div>
                 <div className="space-y-2">
                   <Label>Edited Draft Preview</Label>
-                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{draftPreview}</pre>
+                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{preview.draftPreview}</pre>
                 </div>
               </div>
             </CardContent>

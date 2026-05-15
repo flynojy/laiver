@@ -26,7 +26,7 @@ class FineTuneJobCreate(BaseModel):
     name: str
     source_speaker: str
     backend: FineTuneBackend = FineTuneBackend.LOCAL_QLORA
-    base_model: str = "Qwen/Qwen2.5-7B-Instruct"
+    base_model: str = "Qwen/Qwen3-14B"
     context_window: int = Field(default=6, ge=1, le=12)
     train_ratio: float = Field(default=0.8, gt=0.5, lt=0.98)
     validation_ratio: float = Field(default=0.1, gt=0.0, lt=0.3)

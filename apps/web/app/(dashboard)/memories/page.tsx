@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { MemoryCandidateRecord, MemoryFactRecord, MemoryRecord, MemoryRevisionRecord } from "@agent/shared";
+import type { MemoryType } from "@agent/shared";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,27 @@ import { Label } from "@/components/ui/label";
 import { Table, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  availableMemorySources,
+  buildDuplicateGroups,
+  buildMemoryStatePatch,
+  filterMemoryItems,
+  toCandidateViewModel,
+  toEpisodeViewModel,
+  toFactViewModel,
+  toMemoryDashboard,
+  toMemoryItems,
+  toRevisionViewModel
+} from "@/features/memories/mappers";
+import type {
+  MemoryCandidateViewModel,
+  MemoryDashboardViewModel,
+  MemoryEpisodeViewModel,
+  MemoryFactViewModel,
+  MemoryItemViewModel,
+  MemoryRevisionViewModel,
+  MemoryState
+} from "@/features/memories/view-models";
+import {
   bootstrapUser,
   createMemory,
   getMemoryDebug,
@@ -22,73 +43,32 @@ import {
   searchMemories,
   updateMemory,
   updateMemoryCandidate
-} from "@/lib/api";
-
-type MemoryType = "session" | "episodic" | "semantic" | "instruction";
-type MemoryState = "active" | "pinned" | "archived" | "ignored";
-
-function memoryLabel(memory: MemoryRecord) {
-  return String(memory.metadata?.memory_label ?? "unknown");
-}
-
-function memorySource(memory: MemoryRecord) {
-  return String(memory.metadata?.source ?? "unknown");
-}
-
-function memoryState(memory: MemoryRecord) {
-  return String(memory.metadata?.state ?? "active") as MemoryState;
-}
-
-function memoryScore(memory: MemoryRecord) {
-  return (memory.importance_score + memory.confidence_score) / 2;
-}
-
-function dedupeGroups(memories: MemoryRecord[]) {
-  const groups = new Map<string, MemoryRecord[]>();
-  memories.forEach((memory) => {
-    const key = String(memory.metadata?.dedupe_key ?? "");
-    if (!key) return;
-    groups.set(key, [...(groups.get(key) ?? []), memory]);
-  });
-  return [...groups.values()].filter((group) => group.length > 1);
-}
+} from "@/features/memories/client";
 
 export default function MemoriesPage() {
   const [userId, setUserId] = useState("");
-  const [memories, setMemories] = useState<MemoryRecord[]>([]);
-  const [recentMemories, setRecentMemories] = useState<MemoryRecord[]>([]);
-  const [recentEpisodes, setRecentEpisodes] = useState<
-    Array<{
-      id: string;
-      source_type: string;
-      speaker_role?: string | null;
-      raw_text: string;
-      summary_short?: string | null;
-      importance: number;
-      occurred_at?: string | null;
-    }>
-  >([]);
-  const [recentFacts, setRecentFacts] = useState<MemoryFactRecord[]>([]);
-  const [recentRevisions, setRecentRevisions] = useState<MemoryRevisionRecord[]>([]);
-  const [recentCandidates, setRecentCandidates] = useState<MemoryCandidateRecord[]>([]);
-  const [profileSummary, setProfileSummary] = useState("");
-  const [profileSnapshot, setProfileSnapshot] = useState<Record<string, unknown>>({});
-  const [userProfileSnapshot, setUserProfileSnapshot] = useState<Record<string, unknown>>({});
-  const [relationshipStateSnapshot, setRelationshipStateSnapshot] = useState<Record<string, unknown>>({});
-  const [conflictGroups, setConflictGroups] = useState<
-    Array<{
-      group_id: string;
-      fact_key: string;
-      items: Array<{
-        id: string;
-        content: string;
-        state: string;
-        current_version: boolean;
-        polarity?: string | null;
-      }>;
-    }>
-  >([]);
-  const [lifecycleCounts, setLifecycleCounts] = useState<Record<string, number>>({});
+  const [memories, setMemories] = useState<MemoryItemViewModel[]>([]);
+  const [recentMemories, setRecentMemories] = useState<MemoryItemViewModel[]>([]);
+  const [recentEpisodes, setRecentEpisodes] = useState<MemoryEpisodeViewModel[]>([]);
+  const [recentFacts, setRecentFacts] = useState<MemoryFactViewModel[]>([]);
+  const [recentRevisions, setRecentRevisions] = useState<MemoryRevisionViewModel[]>([]);
+  const [recentCandidates, setRecentCandidates] = useState<MemoryCandidateViewModel[]>([]);
+  const [dashboard, setDashboard] = useState<MemoryDashboardViewModel>({
+    totalMemories: 0,
+    totalEpisodes: 0,
+    totalFacts: 0,
+    totalRevisions: 0,
+    pendingCandidateCount: 0,
+    qdrantAvailable: false,
+    lifecycleActiveCount: 0,
+    lifecyclePinnedCount: 0,
+    lifecycleSupersededCount: 0,
+    profileSummary: "",
+    profileBuckets: [],
+    userProfile: { json: "{}", isEmpty: true },
+    relationshipState: { json: "{}", isEmpty: true },
+    conflictGroups: []
+  });
   const [query, setQuery] = useState("");
   const [content, setContent] = useState("");
   const [memoryType, setMemoryType] = useState<MemoryType>("semantic");
@@ -97,12 +77,6 @@ export default function MemoriesPage() {
   const [filterState, setFilterState] = useState("all");
   const [minScore, setMinScore] = useState("0");
   const [showDedupeOnly, setShowDedupeOnly] = useState(false);
-  const [totalMemories, setTotalMemories] = useState(0);
-  const [totalEpisodes, setTotalEpisodes] = useState(0);
-  const [totalFacts, setTotalFacts] = useState(0);
-  const [totalRevisions, setTotalRevisions] = useState(0);
-  const [candidateCounts, setCandidateCounts] = useState<Record<string, number>>({});
-  const [qdrantAvailable, setQdrantAvailable] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
@@ -112,24 +86,14 @@ export default function MemoriesPage() {
       getMemoryDebug(),
       listMemoryCandidates({ status: "pending", limit: 20 })
     ]);
-    setMemories(memoryRows);
-    setRecentMemories(debug.recent_memories);
-    setRecentEpisodes(debug.recent_episodes);
-    setRecentFacts(debug.recent_facts);
-    setRecentRevisions(debug.recent_revisions);
-    setRecentCandidates(pendingCandidates.length > 0 ? pendingCandidates : debug.recent_candidates);
-    setTotalMemories(debug.total_memories);
-    setTotalEpisodes(debug.total_episodes);
-    setTotalFacts(debug.total_facts);
-    setTotalRevisions(debug.total_revisions);
-    setCandidateCounts(debug.candidate_counts);
-    setQdrantAvailable(debug.qdrant_available);
-    setProfileSummary(debug.profile_summary);
-    setProfileSnapshot(debug.profile_snapshot);
-    setUserProfileSnapshot(debug.user_profile_snapshot);
-    setRelationshipStateSnapshot(debug.relationship_state_snapshot);
-    setConflictGroups(debug.conflict_groups);
-    setLifecycleCounts(debug.lifecycle_counts);
+    const nextDashboard = toMemoryDashboard(debug);
+    setMemories(toMemoryItems(memoryRows));
+    setRecentMemories(toMemoryItems(debug.recent_memories));
+    setRecentEpisodes(debug.recent_episodes.map(toEpisodeViewModel));
+    setRecentFacts(debug.recent_facts.map(toFactViewModel));
+    setRecentRevisions(debug.recent_revisions.map(toRevisionViewModel));
+    setRecentCandidates((pendingCandidates.length > 0 ? pendingCandidates : debug.recent_candidates).map(toCandidateViewModel));
+    setDashboard(nextDashboard);
   }
 
   useEffect(() => {
@@ -167,27 +131,22 @@ export default function MemoriesPage() {
     setError("");
     setStatus("");
     try {
-      setMemories(
-        await searchMemories({
+      const results = await searchMemories({
           user_id: userId,
           query,
           limit: 20
-        })
-      );
+        });
+      setMemories(toMemoryItems(results));
       setStatus("Memory search complete.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Memory search failed.");
     }
   }
 
-  async function handleMemoryState(memory: MemoryRecord, nextState: MemoryState) {
+  async function handleMemoryState(memory: MemoryItemViewModel, nextState: MemoryState) {
     try {
       await updateMemory(memory.id!, {
-        metadata: {
-          ...memory.metadata,
-          state: nextState,
-          pinned: nextState === "pinned"
-        }
+        metadata: buildMemoryStatePatch(memory, nextState)
       });
       await loadMemoryState();
       setStatus(`Memory marked as ${nextState}.`);
@@ -210,7 +169,7 @@ export default function MemoriesPage() {
     }
   }
 
-  async function handleCandidateReview(candidate: MemoryCandidateRecord, nextStatus: "approved" | "rejected") {
+  async function handleCandidateReview(candidate: MemoryCandidateViewModel, nextStatus: "approved" | "rejected") {
     try {
       setError("");
       setStatus("");
@@ -226,27 +185,49 @@ export default function MemoriesPage() {
   }
 
   const filteredMemories = useMemo(() => {
-    const threshold = Number(minScore) || 0;
-    const rows = memories.filter((memory) => {
-      if (filterType !== "all" && memory.memory_type !== filterType) return false;
-      if (filterSource !== "all" && memorySource(memory) !== filterSource) return false;
-      if (filterState !== "all" && memoryState(memory) !== filterState) return false;
-      if (memoryScore(memory) < threshold) return false;
-      return true;
+    return filterMemoryItems(memories, {
+      type: filterType,
+      source: filterSource,
+      state: filterState,
+      minScore,
+      dedupeOnly: showDedupeOnly
     });
-
-    if (!showDedupeOnly) return rows;
-    const duplicateKeys = new Set(
-      dedupeGroups(rows).map((group) => String(group[0]?.metadata?.dedupe_key ?? ""))
-    );
-    return rows.filter((memory) => duplicateKeys.has(String(memory.metadata?.dedupe_key ?? "")));
   }, [filterSource, filterState, filterType, memories, minScore, showDedupeOnly]);
 
-  const duplicateGroups = useMemo(() => dedupeGroups(filteredMemories), [filteredMemories]);
-  const availableSources = useMemo(
-    () => [...new Set(memories.map((memory) => memorySource(memory)))].sort(),
-    [memories]
-  );
+  const duplicateGroups = useMemo(() => buildDuplicateGroups(filteredMemories), [filteredMemories]);
+  const availableSources = useMemo(() => availableMemorySources(memories), [memories]);
+  const memoryPipeline = [
+    {
+      title: "Capture",
+      detail: "Conversation turn becomes a memory row.",
+      value: `${dashboard.totalMemories} rows`
+    },
+    {
+      title: "Episode",
+      detail: "Raw source event is preserved first.",
+      value: `${dashboard.totalEpisodes} episodes`
+    },
+    {
+      title: "Review",
+      detail: "Candidate review gate before commit.",
+      value: `${dashboard.pendingCandidateCount} pending`
+    },
+    {
+      title: "Fact",
+      detail: "Stable facts and revisions are tracked.",
+      value: `${dashboard.totalFacts} facts / ${dashboard.totalRevisions} revisions`
+    },
+    {
+      title: "Profile",
+      detail: "Long-term summary rebuilt from active facts.",
+      value: dashboard.profileSummary ? "ready" : "empty"
+    },
+    {
+      title: "Recall",
+      detail: "Vector search accelerates retrieval.",
+      value: dashboard.qdrantAvailable ? "Qdrant ready" : "SQL fallback"
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -260,6 +241,22 @@ export default function MemoriesPage() {
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
       {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
+      <Card className="bg-white/88">
+        <CardHeader>
+          <CardTitle>Memory Flow</CardTitle>
+          <CardDescription>Writes are captured as episodes first, promoted to candidates and facts, then recalled through the profile and vector index.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          {memoryPipeline.map((step) => (
+            <div key={step.title} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+              <p className="text-sm font-medium">{step.title}</p>
+              <p className="mt-2 text-lg font-semibold">{step.value}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">{step.detail}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
           <Card className="bg-white/88">
             <CardHeader>
@@ -268,15 +265,15 @@ export default function MemoriesPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                <Badge>{totalMemories} total</Badge>
-                <Badge>{totalEpisodes} episodes</Badge>
-                <Badge>{totalFacts} facts</Badge>
-                <Badge>{totalRevisions} revisions</Badge>
-                <Badge>{candidateCounts.pending ?? 0} pending review</Badge>
-                <Badge>{qdrantAvailable ? "Qdrant ready" : "Qdrant fallback"}</Badge>
-                <Badge>{lifecycleCounts.active ?? 0} active</Badge>
-                <Badge>{lifecycleCounts.pinned ?? 0} pinned</Badge>
-                <Badge>{lifecycleCounts.superseded ?? 0} superseded</Badge>
+                <Badge>{dashboard.totalMemories} total</Badge>
+                <Badge>{dashboard.totalEpisodes} episodes</Badge>
+                <Badge>{dashboard.totalFacts} facts</Badge>
+                <Badge>{dashboard.totalRevisions} revisions</Badge>
+                <Badge>{dashboard.pendingCandidateCount} pending review</Badge>
+                <Badge>{dashboard.qdrantAvailable ? "Qdrant ready" : "Qdrant fallback"}</Badge>
+                <Badge>{dashboard.lifecycleActiveCount} active</Badge>
+                <Badge>{dashboard.lifecyclePinnedCount} pinned</Badge>
+                <Badge>{dashboard.lifecycleSupersededCount} superseded</Badge>
               </div>
 
             <div className="space-y-2">
@@ -388,22 +385,22 @@ export default function MemoriesPage() {
               <CardDescription>Stable instructions and preferences are merged into a lightweight profile that can steer later replies.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {profileSummary ? (
+              {dashboard.profileSummary ? (
                 <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm leading-6">
-                  <p className="whitespace-pre-wrap">{profileSummary}</p>
+                  <p className="whitespace-pre-wrap">{dashboard.profileSummary}</p>
                 </div>
               ) : (
                 <p className="text-sm text-[var(--muted-foreground)]">No long-term profile yet.</p>
               )}
 
-              {Array.isArray(profileSnapshot.by_bucket) ? null : (
+              {dashboard.profileBuckets.length > 0 ? (
                 <div className="grid gap-3 md:grid-cols-3">
-                  {Object.entries((profileSnapshot.by_bucket as Record<string, unknown>) ?? {}).map(([bucket, value]) => (
-                    <div key={bucket} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
-                      <p className="text-sm font-medium capitalize">{bucket}</p>
+                  {dashboard.profileBuckets.map((bucket) => (
+                    <div key={bucket.bucket} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+                      <p className="text-sm font-medium capitalize">{bucket.bucket}</p>
                       <div className="mt-3 space-y-2 text-sm text-[var(--muted-foreground)]">
-                        {Array.isArray(value) && value.length > 0 ? (
-                          value.map((item, index) => <p key={index}>{String(item)}</p>)
+                        {bucket.entries.length > 0 ? (
+                          bucket.entries.map((item, index) => <p key={index}>{item}</p>)
                         ) : (
                           <p>No entries.</p>
                         )}
@@ -411,7 +408,7 @@ export default function MemoriesPage() {
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
 
@@ -424,12 +421,12 @@ export default function MemoriesPage() {
               <div className="space-y-3 rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium">User Profile</p>
-                  {userProfileSnapshot.profile_version ? <Badge>v{String(userProfileSnapshot.profile_version)}</Badge> : null}
-                  {userProfileSnapshot.source_fact_count ? <Badge>{String(userProfileSnapshot.source_fact_count)} facts</Badge> : null}
+                  {dashboard.userProfile.profileVersion ? <Badge>v{dashboard.userProfile.profileVersion}</Badge> : null}
+                  {dashboard.userProfile.sourceFactCount ? <Badge>{dashboard.userProfile.sourceFactCount} facts</Badge> : null}
                 </div>
-                {Object.keys(userProfileSnapshot).length > 0 ? (
+                {!dashboard.userProfile.isEmpty ? (
                   <pre className="overflow-x-auto rounded-[1rem] bg-[#faf8f4] p-3 text-xs leading-6">
-                    {JSON.stringify(userProfileSnapshot, null, 2)}
+                    {dashboard.userProfile.json}
                   </pre>
                 ) : (
                   <p className="text-sm text-[var(--muted-foreground)]">No structured profile yet.</p>
@@ -439,16 +436,16 @@ export default function MemoriesPage() {
               <div className="space-y-3 rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium">Relationship State</p>
-                  {relationshipStateSnapshot.relationship_stage ? (
-                    <Badge>{String(relationshipStateSnapshot.relationship_stage)}</Badge>
+                  {dashboard.relationshipState.relationshipStage ? (
+                    <Badge>{dashboard.relationshipState.relationshipStage}</Badge>
                   ) : null}
-                  {relationshipStateSnapshot.preferred_tone ? (
-                    <Badge>{String(relationshipStateSnapshot.preferred_tone)}</Badge>
+                  {dashboard.relationshipState.preferredTone ? (
+                    <Badge>{dashboard.relationshipState.preferredTone}</Badge>
                   ) : null}
                 </div>
-                {Object.keys(relationshipStateSnapshot).length > 0 ? (
+                {!dashboard.relationshipState.isEmpty ? (
                   <pre className="overflow-x-auto rounded-[1rem] bg-[#faf8f4] p-3 text-xs leading-6">
-                    {JSON.stringify(relationshipStateSnapshot, null, 2)}
+                    {dashboard.relationshipState.json}
                   </pre>
                 ) : (
                   <p className="text-sm text-[var(--muted-foreground)]">No relationship snapshot yet.</p>
@@ -469,18 +466,18 @@ export default function MemoriesPage() {
                 recentMemories.slice(0, 6).map((memory) => (
                   <div key={memory.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{memory.memory_type}</Badge>
-                      <Badge>{memoryLabel(memory)}</Badge>
-                      <Badge>{String(memory.metadata?.write_strategy ?? "strategy:unknown")}</Badge>
-                      <Badge>{memoryState(memory)}</Badge>
-                      <Badge>importance {memory.importance_score}</Badge>
-                      <Badge>confidence {memory.confidence_score}</Badge>
-                      <Badge>reinforce {String(memory.metadata?.reinforcement_count ?? 1)}</Badge>
-                      <Badge>{String(memory.metadata?.current_version ?? true) ? "current" : "older"}</Badge>
+                      <Badge>{memory.type}</Badge>
+                      <Badge>{memory.label}</Badge>
+                      <Badge>{memory.writeStrategy}</Badge>
+                      <Badge>{memory.state}</Badge>
+                      <Badge>importance {memory.importance}</Badge>
+                      <Badge>confidence {memory.confidence}</Badge>
+                      <Badge>reinforce {memory.reinforcementCount}</Badge>
+                      <Badge>{memory.currentVersion ? "current" : "older"}</Badge>
                     </div>
                     <p className="mt-3 text-sm leading-6">{memory.content}</p>
                     <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-                      source: {memorySource(memory)} | fact key: {String(memory.metadata?.fact_key ?? "n/a")} | dedupe key: {String(memory.metadata?.dedupe_key ?? "n/a")}
+                      source: {memory.source} | fact key: {memory.factKey} | dedupe key: {memory.dedupeKey || "n/a"}
                     </p>
                   </div>
                 ))
@@ -500,14 +497,14 @@ export default function MemoriesPage() {
                 recentEpisodes.slice(0, 6).map((episode) => (
                   <div key={episode.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{episode.source_type}</Badge>
-                      {episode.speaker_role ? <Badge>{episode.speaker_role}</Badge> : null}
+                      <Badge>{episode.sourceType}</Badge>
+                      {episode.speakerRole ? <Badge>{episode.speakerRole}</Badge> : null}
                       <Badge>importance {episode.importance}</Badge>
                     </div>
-                    <p className="mt-3 text-sm leading-6">{episode.summary_short || episode.raw_text}</p>
-                    {episode.occurred_at ? (
+                    <p className="mt-3 text-sm leading-6">{episode.text}</p>
+                    {episode.occurredAtLabel ? (
                       <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-                        occurred: {new Date(episode.occurred_at).toLocaleString()}
+                        occurred: {episode.occurredAtLabel}
                       </p>
                     ) : null}
                   </div>
@@ -528,17 +525,17 @@ export default function MemoriesPage() {
                 recentFacts.slice(0, 6).map((fact) => (
                   <div key={fact.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{fact.fact_type}</Badge>
+                      <Badge>{fact.factType}</Badge>
                       <Badge>{fact.status}</Badge>
-                      <Badge>{fact.subject_kind}</Badge>
+                      <Badge>{fact.subjectKind}</Badge>
                       <Badge>confidence {fact.confidence}</Badge>
                       <Badge>importance {fact.importance}</Badge>
-                      <Badge>stable {fact.stability_score}</Badge>
-                      <Badge>reinforce {fact.reinforcement_count}</Badge>
+                      <Badge>stable {fact.stability}</Badge>
+                      <Badge>reinforce {fact.reinforcementCount}</Badge>
                     </div>
-                    <p className="mt-3 text-sm leading-6">{fact.value_text || JSON.stringify(fact.value_json)}</p>
+                    <p className="mt-3 text-sm leading-6">{fact.value}</p>
                     <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-                      predicate: {fact.predicate_key} | key: {fact.normalized_key} | sensitivity: {fact.sensitivity}
+                      predicate: {fact.predicateKey} | key: {fact.normalizedKey} | sensitivity: {fact.sensitivity}
                     </p>
                   </div>
                 ))
@@ -562,16 +559,14 @@ export default function MemoriesPage() {
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{revision.op}</Badge>
-                      <Badge>revision {revision.revision_no}</Badge>
-                      <Badge>{revision.author_type}</Badge>
-                      {revision.conflict_group_id ? <Badge>{revision.conflict_group_id}</Badge> : null}
+                      <Badge>revision {revision.revisionNo}</Badge>
+                      <Badge>{revision.authorType}</Badge>
+                      {revision.conflictGroupId ? <Badge>{revision.conflictGroupId}</Badge> : null}
                     </div>
-                    <p className="mt-3 text-sm leading-6">
-                      {revision.content_text || JSON.stringify(revision.value_json)}
-                    </p>
+                    <p className="mt-3 text-sm leading-6">{revision.value}</p>
                     <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-                      fact: {revision.fact_id} | delta: {revision.confidence_delta}
-                      {revision.valid_to ? ` | retired: ${new Date(revision.valid_to).toLocaleString()}` : ""}
+                      fact: {revision.factId} | delta: {revision.confidenceDelta}
+                      {revision.retiredAtLabel ? ` | retired: ${revision.retiredAtLabel}` : ""}
                     </p>
                   </div>
                 ))
@@ -594,20 +589,17 @@ export default function MemoriesPage() {
                     className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{candidate.candidate_type}</Badge>
-                      <Badge>{candidate.proposed_action}</Badge>
+                      <Badge>{candidate.type}</Badge>
+                      <Badge>{candidate.proposedAction}</Badge>
                       <Badge>{candidate.status}</Badge>
-                      {candidate.proposed_value?.fact_id ? <Badge>fact linked</Badge> : <Badge>gated</Badge>}
-                      <Badge>salience {candidate.salience_score}</Badge>
-                      <Badge>confidence {candidate.confidence_score}</Badge>
+                      {candidate.factLinked ? <Badge>fact linked</Badge> : <Badge>gated</Badge>}
+                      <Badge>salience {candidate.salience}</Badge>
+                      <Badge>confidence {candidate.confidence}</Badge>
                       <Badge>{candidate.sensitivity}</Badge>
                     </div>
-                    <p className="mt-3 text-sm leading-6">{candidate.extracted_text}</p>
+                    <p className="mt-3 text-sm leading-6">{candidate.extractedText}</p>
                     <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-                      key: {candidate.normalized_key} | reasons:{" "}
-                      {candidate.reason_codes.length > 0
-                        ? candidate.reason_codes.map((item) => String(item)).join(", ")
-                        : "none"}
+                      key: {candidate.normalizedKey} | reasons: {candidate.reasonLabel}
                     </p>
                     <div className="mt-3 flex gap-3">
                       <Button
@@ -636,18 +628,18 @@ export default function MemoriesPage() {
               <CardDescription>When newer instructions or preferences contradict older ones, the older version is marked and removed from active recall.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {conflictGroups.length === 0 ? (
+              {dashboard.conflictGroups.length === 0 ? (
                 <p className="text-sm text-[var(--muted-foreground)]">No conflict groups yet.</p>
               ) : (
-                conflictGroups.map((group) => (
-                  <div key={group.group_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
-                    <p className="text-sm font-medium">{group.fact_key || group.group_id}</p>
+                dashboard.conflictGroups.map((group) => (
+                  <div key={group.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                    <p className="text-sm font-medium">{group.label}</p>
                     <div className="mt-3 space-y-2">
                       {group.items.map((item) => (
                         <div key={item.id} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
                           <div className="flex flex-wrap gap-2">
                             <Badge>{item.state}</Badge>
-                            <Badge>{item.current_version ? "current" : "superseded"}</Badge>
+                            <Badge>{item.currentVersion ? "current" : "superseded"}</Badge>
                             {item.polarity ? <Badge>{item.polarity}</Badge> : null}
                           </div>
                           <p className="mt-2">{item.content}</p>
@@ -670,14 +662,14 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No duplicate groups in the current filtered set.</p>
               ) : (
                 duplicateGroups.map((group) => (
-                  <div key={String(group[0]?.metadata?.dedupe_key ?? group[0]?.id)} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
-                    <p className="text-sm font-medium">{String(group[0]?.metadata?.dedupe_key ?? "unknown")}</p>
+                  <div key={group.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                    <p className="text-sm font-medium">{group.label}</p>
                     <div className="mt-3 space-y-2">
-                      {group.map((memory) => (
+                      {group.items.map((memory) => (
                         <div key={memory.id} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
                           <div className="flex flex-wrap gap-2">
-                            <Badge>{memoryLabel(memory)}</Badge>
-                            <Badge>{memoryState(memory)}</Badge>
+                            <Badge>{memory.label}</Badge>
+                            <Badge>{memory.state}</Badge>
                           </div>
                           <p className="mt-2">{memory.content}</p>
                         </div>
@@ -711,12 +703,12 @@ export default function MemoriesPage() {
                   <tbody>
                     {filteredMemories.map((memory) => (
                       <TableRow key={memory.id}>
-                        <TableCell>{memory.memory_type}</TableCell>
-                        <TableCell>{memoryLabel(memory)}</TableCell>
+                        <TableCell>{memory.type}</TableCell>
+                        <TableCell>{memory.label}</TableCell>
                         <TableCell>{memory.content}</TableCell>
-                        <TableCell>{`${memory.importance_score} / ${memory.confidence_score}`}</TableCell>
-                        <TableCell>{memorySource(memory)}</TableCell>
-                        <TableCell>{memoryState(memory)}</TableCell>
+                        <TableCell>{`${memory.importance} / ${memory.confidence}`}</TableCell>
+                        <TableCell>{memory.source}</TableCell>
+                        <TableCell>{memory.state}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-2">
                             <Button variant="secondary" onClick={() => handleMemoryState(memory, "pinned")}>

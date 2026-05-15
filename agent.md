@@ -91,7 +91,7 @@ scripts/
 
 - 更多微信导出格式支持。
 - 大文件异步导入和断点续传。
-- 真实 GPU 训练稳定性、资源占用和质量验证。
+- 真实 GPU 训练稳定性、资源占用和质量验证；当前默认方案是 `Qwen/Qwen3-14B` + QLoRA，16GB 显存优先走 WSL2/Linux。
 - fine-tune 效果评估和 A/B 对比。
 - 模型 health check、fallback 和更完整的路由策略。
 - memory rollback、merge、privacy tier 和更深的治理操作。
@@ -105,12 +105,18 @@ scripts/
 从仓库根目录执行：
 
 ```powershell
-nvm use 22
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 npm.cmd ci
 python -m pip install -e "apps/api[dev]"
 npm.cmd run windows:doctor
+npm.cmd run windows:local
+npm.cmd run windows:local:stop
+```
+
+Docker 完整链路后置，只有在需要 PostgreSQL / Redis / Qdrant 或容器化验收时再执行：
+
+```powershell
 npm.cmd run windows:infra:up
 npm.cmd run windows:db:migrate
 npm.cmd run windows:dev:api
@@ -127,7 +133,6 @@ python scripts/run_mvp_regression.py
 前端单独验证：
 
 ```powershell
-nvm use 22
 npm.cmd ci
 npm.cmd run typecheck:web
 npm.cmd run build:web

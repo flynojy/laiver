@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -137,7 +138,7 @@ def _build_mock_grounded_response(
         matches = memory_execution.output.get("matches", [])
         if matches:
             fallback_status = "mock_provider_grounded"
-            sections.append("Based on related memory, here is the most relevant preference I found:")
+            sections.append("我记得和这件事相关的信息：")
             for match in matches[:2]:
                 content = str(match.get("content", "")).strip()
                 if content:
@@ -148,7 +149,7 @@ def _build_mock_grounded_response(
         tasks = task_execution.output.get("tasks", [])
         if tasks:
             fallback_status = "mock_provider_grounded"
-            sections.append("Structured action items:")
+            sections.append("我先帮你整理成几个待办：")
             for index, task in enumerate(tasks[:5], start=1):
                 title = str(task.get("title", "Untitled task")).strip()
                 priority = str(task.get("priority", "low")).strip()
@@ -160,39 +161,153 @@ def _build_mock_grounded_response(
     failed = [item for item in executions if item.error]
     if failed:
         fallback_status = "skill_error_fallback"
-        sections.append("One or more skills failed, so I used the available grounded context and a safe fallback response.")
+        sections.append("有些工具调用失败了，所以我先根据当前上下文给你一个保守回复。")
         for item in failed:
             sections.append(f"- {item.skill.slug}: {item.error}")
 
     if conversation_summary and not sections:
         fallback_status = "mock_provider_compressed_context"
-        sections.append("Long-horizon conversation summary:")
+        sections.append("我参考了前面对话摘要：")
         sections.append(conversation_summary)
 
     if not sections:
-        tone = persona.tone if persona else "clear and supportive"
-        verbosity = persona.verbosity if persona else "concise"
-        if verbosity == "detailed":
-            sections.append(f"I'll answer in a {tone} and more detailed way.")
-            sections.append("Mock mode is active, so this response uses local fallback behavior rather than a live model completion.")
-            sections.append("I will keep the structure explicit and expand the reasoning where it helps.")
+        if persona:
+            phrases = [item for item in persona.common_phrases[:2] if item]
+            if message.strip() in {"你好", "嗨", "hello", "Hello", "hi", "Hi"}:
+                greeting = phrases[0] if phrases else "早安"
+                sections.append(f"{greeting}。看到你发来消息，我就安心一点。")
+                sections.append("今天也想听你多说一点，不管是学校、心情，还是只是想叫我一声。")
+            elif persona.verbosity == "detailed":
+                sections.append(f"我在听。你刚才说的是：{message}")
+                sections.append("我会按我们现在的关系和语气认真回应你，尽量说得清楚一点。")
+            else:
+                sections.append(f"我在。你刚才说：{message}")
+                sections.append("我会陪你把这件事慢慢说清楚。")
         else:
-            sections.append(f"I'll keep this {tone} and concise.")
-            sections.append("Mock mode is active, so this response uses local fallback behavior rather than a live model completion.")
-        if persona and persona.common_topics:
-            sections.append(f"Current persona focus: {', '.join(persona.common_topics[:3])}.")
-        if persona and persona.common_phrases:
-            sections.append(f"Signature phrasing to keep in view: {persona.common_phrases[0]}")
-        sections.append(f"I will use the current conversation context and stay aligned with the request: {message}")
+            sections.append(f"我在。你刚才说：{message}")
+            sections.append("我会根据当前对话继续帮你。")
     elif persona:
         if persona.verbosity == "detailed":
-            sections.append(f"I'll keep the tone {persona.tone} and add detail where it improves clarity.")
+            sections.append("我会按现在的语气多补一点细节。")
         else:
-            sections.append(f"I'll keep the tone {persona.tone} and stay concise.")
+            sections.append("我会按现在的语气简洁回应。")
         if persona.common_phrases:
-            sections.append(f"Preferred phrasing cue: {persona.common_phrases[0]}")
+            sections.append(f"{persona.common_phrases[0]}")
 
     return "\n".join(sections), fallback_status
+
+
+def _extract_user_like_statement(message: str) -> str | None:
+    compact = " ".join(message.strip().split())
+    if any(token in compact for token in ("什么", "吗", "嘛", "?", "？", "what")):
+        return None
+    patterns = [
+        r"^我喜欢吃(?P<item>.+)$",
+        r"^我喜欢(?P<item>.+)$",
+        r"^我爱吃(?P<item>.+)$",
+        r"^我爱(?P<item>.+)$",
+        r"^I like (?P<item>.+)$",
+        r"^I love (?P<item>.+)$",
+    ]
+    for pattern in patterns:
+        match = re.match(pattern, compact, flags=re.IGNORECASE)
+        if not match:
+            continue
+        item = match.group("item").strip(" 。.，,！!？?")
+        return item or None
+    return None
+
+
+def _extract_liked_items_from_text(text: str) -> list[str]:
+    items: list[str] = []
+    if any(token in text for token in ("我喜欢什么", "我喜欢吃什么", "我爱吃什么", "what do i like")):
+        return items
+    patterns = [
+        r"我喜欢吃([^。！？\n，,]+)",
+        r"我喜欢([^。！？\n，,]+)",
+        r"我爱吃([^。！？\n，,]+)",
+        r"我爱([^。！？\n，,]+)",
+        r"I like ([^.\n,!?]+)",
+        r"I love ([^.\n,!?]+)",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            item = match.group(1).strip(" 。.，,！!？?")
+            item = re.sub(r"^(吃|喝)\s*", "", item).strip()
+            if any(token in item for token in ("什么", "吗", "嘛", "?", "？", "what")):
+                continue
+            if item and item not in items:
+                items.append(item)
+    return items
+
+
+def _answer_like_question(message: str, executions: list[SkillExecutionResult], recent_messages: list[Message]) -> str | None:
+    compact = " ".join(message.strip().split()).lower()
+    asks_like = any(
+        token in compact
+        for token in (
+            "我喜欢什么",
+            "我喜欢吃什么",
+            "我爱吃什么",
+            "what do i like",
+            "what food do i like",
+        )
+    )
+    if not asks_like:
+        return None
+
+    evidence_texts: list[str] = []
+    for execution in executions:
+        if not (_uses_handler(execution, "memory-search") and execution.success):
+            continue
+        for match in execution.output.get("matches", []):
+            content = str(match.get("content", "")).strip()
+            if content:
+                evidence_texts.append(content)
+
+    for item in reversed(recent_messages):
+        if item.role == MessageRole.USER:
+            evidence_texts.append(item.content)
+
+    liked_items: list[str] = []
+    for text in evidence_texts:
+        for item in _extract_liked_items_from_text(text):
+            if item not in liked_items:
+                liked_items.append(item)
+
+    if not liked_items:
+        return "我还没有可靠地记住你喜欢什么。你可以直接告诉我一次，我会认真记下来。"
+
+    if len(liked_items) == 1:
+        return f"你喜欢{liked_items[0]}。我记住了。"
+    return f"你喜欢{'、'.join(liked_items[:4])}。我记住了。"
+
+
+def _build_local_chat_response(
+    *,
+    message: str,
+    persona: Persona | None,
+    executions: list[SkillExecutionResult],
+    recent_messages: list[Message],
+) -> str | None:
+    like_answer = _answer_like_question(message, executions, recent_messages)
+    if like_answer:
+        return like_answer
+
+    liked_item = _extract_user_like_statement(message)
+    if liked_item:
+        if persona:
+            return f"我记住了，你喜欢{liked_item}。下次看到{liked_item}，我大概会先想到你。"
+        return f"记住了，你喜欢{liked_item}。"
+
+    stripped = message.strip()
+    greetings = {"你好", "嗨", "hello", "Hello", "hi", "Hi"}
+    if stripped in greetings and persona:
+        phrases = [item for item in persona.common_phrases[:2] if item]
+        greeting = phrases[0] if phrases else "早安"
+        return f"{greeting}。你来找我了，我有点开心。今天想和我聊什么？"
+
+    return None
 
 
 def _merge_controls(payload: AgentChatRequest, conversation: Conversation) -> ConversationControls:
@@ -346,7 +461,11 @@ async def respond(db: Session, payload: AgentChatRequest) -> AgentChatResponse:
         prompt_messages.append(grounding_message)
 
     completion = await router.complete(
-        ModelCompletionRequest(messages=prompt_messages + precomputed_tool_messages, tools=tool_definitions)
+        ModelCompletionRequest(
+            provider_id=payload.provider_id,
+            messages=prompt_messages + precomputed_tool_messages,
+            tools=tool_definitions,
+        )
     )
 
     if completion.tool_calls and merged_controls.skills_enabled:
@@ -383,7 +502,11 @@ async def respond(db: Session, payload: AgentChatRequest) -> AgentChatResponse:
         if grounding_message:
             rerun_messages = prompt_messages[:-1] + [grounding_message] + precomputed_tool_messages + tool_messages
         completion = await router.complete(
-            ModelCompletionRequest(messages=rerun_messages, tools=tool_definitions)
+            ModelCompletionRequest(
+                provider_id=payload.provider_id,
+                messages=rerun_messages,
+                tools=tool_definitions,
+            )
         )
 
     model_mode = "mock" if completion.finish_reason == "mock" else "live"
@@ -391,12 +514,22 @@ async def respond(db: Session, payload: AgentChatRequest) -> AgentChatResponse:
     fallback_status = "not_used"
 
     if model_mode == "mock":
-        response_content, fallback_status = _build_mock_grounded_response(
+        local_chat_response = _build_local_chat_response(
             message=payload.message,
-            executions=executions,
             persona=persona,
-            conversation_summary=pre_prompt_compression.summary_text,
+            executions=executions,
+            recent_messages=history_messages,
         )
+        if local_chat_response:
+            response_content = local_chat_response
+            fallback_status = "mock_provider_conversational"
+        else:
+            response_content, fallback_status = _build_mock_grounded_response(
+                message=payload.message,
+                executions=executions,
+                persona=persona,
+                conversation_summary=pre_prompt_compression.summary_text,
+            )
     elif any(execution.error for execution in executions):
         fallback_status = "skill_error_notice"
     elif executions:
@@ -423,6 +556,9 @@ async def respond(db: Session, payload: AgentChatRequest) -> AgentChatResponse:
             "provider_name": completion.provider,
             "model_name": completion.model,
             "model_mode": model_mode,
+            "model_think_enabled": completion.usage.get("think_enabled"),
+            "model_think_gate": completion.usage.get("think_gate"),
+            "model_think_reason": completion.usage.get("think_reason"),
             "route_policy": completion.route_policy,
             "fallback_policy": completion.fallback_policy,
             "provider_fallback_used": completion.fallback_used,
@@ -532,6 +668,9 @@ async def respond(db: Session, payload: AgentChatRequest) -> AgentChatResponse:
             provider_name=completion.provider,
             model_name=completion.model,
             model_mode=model_mode,
+            model_think_enabled=completion.usage.get("think_enabled"),
+            model_think_gate=completion.usage.get("think_gate"),
+            model_think_reason=completion.usage.get("think_reason"),
             route_policy=completion.route_policy,
             fallback_policy=completion.fallback_policy,
             provider_fallback_used=completion.fallback_used,

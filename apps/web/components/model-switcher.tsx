@@ -1,30 +1,21 @@
 "use client";
 
-import type { ModelProviderConfig, ModelProviderValidationResult, UUID } from "@agent/shared";
+import type { UUID } from "@agent/shared";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { ProviderCardViewModel, ProviderValidationViewModel } from "@/features/providers/view-models";
 
 type ModelSwitcherProps = {
-  providers: ModelProviderConfig[];
+  providers: ProviderCardViewModel[];
   selectedProviderId: UUID | "";
-  validation: ModelProviderValidationResult | null;
+  validation: ProviderValidationViewModel | null;
   loading: boolean;
   onSelect: (providerId: UUID) => void;
   onSwitchDefault: (providerId: UUID) => void;
   onValidate: (providerId: UUID) => void;
 };
-
-function statusLabel(provider: ModelProviderConfig, validation: ModelProviderValidationResult | null) {
-  if (!provider.is_enabled) {
-    return "disabled";
-  }
-  if (validation && validation.provider_id === provider.id) {
-    return validation.health_status;
-  }
-  return provider.is_default ? "current" : "available";
-}
 
 export function ModelSwitcher({
   providers,
@@ -35,10 +26,9 @@ export function ModelSwitcher({
   onSwitchDefault,
   onValidate
 }: ModelSwitcherProps) {
-  const defaultProvider = providers.find((provider) => provider.is_default) ?? providers[0] ?? null;
+  const defaultProvider = providers.find((provider) => provider.isDefault) ?? providers[0] ?? null;
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId) ?? defaultProvider;
-  const defaultValidation =
-    validation && validation.provider_id === defaultProvider?.id ? validation : null;
+  const defaultValidation = validation && validation.providerId === defaultProvider?.id ? validation : null;
 
   return (
     <Card className="bg-white/88">
@@ -50,17 +40,16 @@ export function ModelSwitcher({
         <div className="rounded-lg border border-[color:var(--border)] bg-[#faf8f4] p-4">
           <div className="flex flex-wrap gap-2">
             <Badge>current</Badge>
-            {defaultProvider ? <Badge>{defaultProvider.provider_type}</Badge> : null}
-            {defaultValidation ? <Badge>{defaultValidation.health_status}</Badge> : null}
+            {defaultProvider ? <Badge>{defaultProvider.providerType}</Badge> : null}
+            {defaultValidation ? <Badge>{defaultValidation.healthStatus}</Badge> : null}
           </div>
           <p className="mt-3 font-medium">{defaultProvider?.name ?? "No default provider"}</p>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            {defaultProvider ? defaultProvider.model_name : "Create or bootstrap a provider before switching."}
+            {defaultProvider ? defaultProvider.modelName : "Create or bootstrap a provider before switching."}
           </p>
           {defaultValidation ? (
             <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-              fallback {defaultValidation.fallback_policy}{" "}
-              {defaultValidation.fallback_available ? "available" : "unavailable"}
+              fallback {defaultValidation.fallbackPolicy} {defaultValidation.fallbackAvailable ? "available" : "unavailable"}
             </p>
           ) : null}
         </div>
@@ -68,7 +57,7 @@ export function ModelSwitcher({
         <div className="space-y-2">
           {providers.map((provider) => {
             const isSelected = provider.id === selectedProvider?.id;
-            const canSwitch = Boolean(provider.id) && provider.is_enabled && !provider.is_default;
+            const canSwitch = Boolean(provider.id) && provider.isEnabled && !provider.isDefault;
             return (
               <button
                 key={provider.id}
@@ -82,12 +71,12 @@ export function ModelSwitcher({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap gap-2">
-                      <Badge>{provider.provider_type}</Badge>
-                      <Badge>{statusLabel(provider, validation)}</Badge>
-                      {provider.is_default ? <Badge>default</Badge> : null}
+                      <Badge>{provider.providerType}</Badge>
+                      <Badge>{provider.statusLabel}</Badge>
+                      {provider.isDefault ? <Badge>default</Badge> : null}
                     </div>
                     <p className="mt-2 font-medium">{provider.name}</p>
-                    <p className="mt-1 text-xs text-[var(--muted-foreground)]">{provider.model_name}</p>
+                    <p className="mt-1 text-xs text-[var(--muted-foreground)]">{provider.modelName}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button

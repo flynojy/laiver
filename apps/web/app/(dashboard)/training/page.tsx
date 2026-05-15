@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { FineTuneJobDetail, FineTuneJobRecord, UUID } from "@agent/shared";
+import type { UUID } from "@agent/shared";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  buildWorkflowStages,
+  speakerOptionsForImport,
+  toTrainingJobCard,
+  toTrainingJobDetail
+} from "@/features/training/mappers";
+import type {
+  TrainingJobCardViewModel,
+  TrainingJobDetailViewModel,
+  TrainingSpeakerOptionViewModel,
+  TrainingWorkflowStageViewModel
+} from "@/features/training/view-models";
 import {
   createFineTuneJob,
   getFineTuneJob,
@@ -19,45 +31,18 @@ import {
   registerFineTuneProvider,
   updateModelProvider,
   type ImportDetail
-} from "@/lib/api";
+} from "@/features/training/client";
 
-function speakerOptionsForImport(importRow: ImportDetail | null) {
-  if (!importRow) {
-    return [];
-  }
-  const summary = importRow.import_job.normalized_summary ?? {};
-  const speakerStats = summary.speaker_stats;
-  if (speakerStats && typeof speakerStats === "object") {
-    return Object.entries(speakerStats)
-      .map(([speaker, value]) => ({
-        speaker,
-        count:
-          value && typeof value === "object" && "message_count" in value
-            ? Number((value as { message_count?: number }).message_count ?? 0)
-            : 0
-      }))
-      .sort((left, right) => right.count - left.count);
-  }
-
-  const counts = new Map<string, number>();
-  for (const message of importRow.normalized_messages) {
-    counts.set(message.speaker, (counts.get(message.speaker) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .map(([speaker, count]) => ({ speaker, count }))
-    .sort((left, right) => right.count - left.count);
-}
-
-function DatasetPreview({ detail }: { detail: FineTuneJobDetail | null }) {
+function DatasetPreview({ detail }: { detail: TrainingJobDetailViewModel | null }) {
   if (!detail) {
     return <p className="text-sm text-[var(--muted-foreground)]">Create or select a job to inspect the generated dataset preview.</p>;
   }
 
   return (
     <div className="space-y-4">
-      {detail.dataset_preview.map((sample, index) => (
-        <div key={`${detail.job.id}-${index}`} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
-          <p className="text-sm font-medium">Sample {index + 1}</p>
+      {detail.datasetSamples.map((sample) => (
+        <div key={sample.id} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+          <p className="text-sm font-medium">{sample.label}</p>
           <div className="mt-3 space-y-2 text-sm">
             {sample.messages.map((message, messageIndex) => (
               <div key={messageIndex} className="rounded-md bg-white px-3 py-2">
@@ -74,15 +59,15 @@ function DatasetPreview({ detail }: { detail: FineTuneJobDetail | null }) {
 
 export default function TrainingPage() {
   const [imports, setImports] = useState<ImportDetail[]>([]);
-  const [jobs, setJobs] = useState<FineTuneJobRecord[]>([]);
+  const [jobs, setJobs] = useState<TrainingJobCardViewModel[]>([]);
   const [selectedImportId, setSelectedImportId] = useState<UUID>("");
   const [selectedJobId, setSelectedJobId] = useState<UUID>("");
   const [selectedSpeaker, setSelectedSpeaker] = useState("");
   const [jobName, setJobName] = useState("Laiver Local Fine-Tune");
   const [backend, setBackend] = useState<"local_lora" | "local_qlora">("local_qlora");
-  const [baseModel, setBaseModel] = useState("Qwen/Qwen2.5-7B-Instruct");
+  const [baseModel, setBaseModel] = useState("Qwen/Qwen3-14B");
   const [contextWindow, setContextWindow] = useState("6");
-  const [detail, setDetail] = useState<FineTuneJobDetail | null>(null);
+  const [detail, setDetail] = useState<TrainingJobDetailViewModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [registering, setRegistering] = useState(false);
@@ -92,13 +77,13 @@ export default function TrainingPage() {
   async function refresh(activeJobId?: string) {
     const [importRows, jobRows] = await Promise.all([listImports(), listFineTuneJobs()]);
     setImports(importRows);
-    setJobs(jobRows);
+    setJobs(jobRows.map(toTrainingJobCard));
     const nextImportId = selectedImportId || importRows[0]?.import_job.id || "";
     setSelectedImportId(nextImportId);
     const nextJobId = activeJobId ?? jobRows[0]?.id ?? "";
     setSelectedJobId(nextJobId);
     if (nextJobId) {
-      setDetail(await getFineTuneJob(nextJobId));
+      setDetail(toTrainingJobDetail(await getFineTuneJob(nextJobId)));
     } else {
       setDetail(null);
     }
@@ -106,7 +91,7 @@ export default function TrainingPage() {
 
   async function refreshJobDetail(jobId: UUID) {
     setSelectedJobId(jobId);
-    setDetail(await getFineTuneJob(jobId));
+    setDetail(toTrainingJobDetail(await getFineTuneJob(jobId)));
   }
 
   useEffect(() => {
@@ -116,7 +101,7 @@ export default function TrainingPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedJobId || detail?.job.status !== "running") {
+    if (!selectedJobId || detail?.status !== "running") {
       return undefined;
     }
     const timer = window.setInterval(() => {
@@ -125,13 +110,17 @@ export default function TrainingPage() {
       });
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [detail?.job.status, selectedJobId]);
+  }, [detail?.status, selectedJobId]);
 
   const selectedImport = useMemo(
     () => imports.find((item) => item.import_job.id === selectedImportId) ?? imports[0] ?? null,
     [imports, selectedImportId]
   );
-  const speakers = useMemo(() => speakerOptionsForImport(selectedImport), [selectedImport]);
+  const speakers = useMemo<TrainingSpeakerOptionViewModel[]>(() => speakerOptionsForImport(selectedImport), [selectedImport]);
+  const workflowStages = useMemo<TrainingWorkflowStageViewModel[]>(
+    () => buildWorkflowStages(selectedImport, selectedSpeaker, detail),
+    [detail, selectedImport, selectedSpeaker]
+  );
 
   useEffect(() => {
     const defaultSpeaker =
@@ -163,7 +152,7 @@ export default function TrainingPage() {
         base_model: baseModel,
         context_window: Number(contextWindow)
       });
-      setDetail(created);
+      setDetail(toTrainingJobDetail(created));
       setStatus(`${created.job.name} created. Dataset export is ready for local training.`);
       await refresh(created.job.id);
     } catch (reason) {
@@ -182,7 +171,7 @@ export default function TrainingPage() {
     setError("");
     setStatus("");
     try {
-      const job = await launchFineTuneJob(detail.job.id);
+      const job = await launchFineTuneJob(detail.id);
       await refresh(job.id);
       setStatus(`${job.name} has started. Laiver will keep refreshing the local training status.`);
     } catch (reason) {
@@ -200,8 +189,8 @@ export default function TrainingPage() {
     setError("");
     setStatus("");
     try {
-      const provider = await registerFineTuneProvider(detail.job.id);
-      await refresh(detail.job.id);
+      const provider = await registerFineTuneProvider(detail.id);
+      await refresh(detail.id);
       setStatus(`${provider.name} is now available in the provider registry.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Provider registration failed.");
@@ -211,16 +200,16 @@ export default function TrainingPage() {
   }
 
   async function handleSetRegisteredProviderDefault() {
-    if (!detail?.registered_provider?.id) {
+    if (!detail?.registeredProvider?.id) {
       return;
     }
     setLoading(true);
     setError("");
     setStatus("");
     try {
-      await updateModelProvider(detail.registered_provider.id, { is_default: true });
-      await refresh(detail.job.id);
-      setStatus(`${detail.registered_provider.name} is now the default model provider.`);
+      await updateModelProvider(detail.registeredProvider.id, { is_default: true });
+      await refresh(detail.id);
+      setStatus(`${detail.registeredProvider.name} is now the default model provider.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Updating the default provider failed.");
     } finally {
@@ -233,19 +222,37 @@ export default function TrainingPage() {
       <PageHeader
         eyebrow="Local Fine-Tuning"
         title="Training Jobs"
-        description="Turn imported chat history into local LoRA or QLoRA datasets, launch training locally, and register the finished adapter as a selectable model."
+        description="Turn imported chat history into Qwen3-14B LoRA or QLoRA datasets, launch local training, and register the finished adapter as a selectable model."
         badge="Dataset + Model"
       />
 
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
       {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
 
+      <Card className="bg-white/88">
+        <CardHeader>
+          <CardTitle>Training Flow</CardTitle>
+          <CardDescription>The dataset, local runner, provider registration, and default switch are kept in one chain.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {workflowStages.map((stage) => (
+            <div key={stage.title} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge>{stage.title}</Badge>
+                <Badge>{stage.done ? "done" : "pending"}</Badge>
+              </div>
+              <p className="mt-3 text-sm font-medium">{stage.detail}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
         <div className="space-y-4">
           <Card className="bg-white/88">
             <CardHeader>
               <CardTitle>Create Job</CardTitle>
-              <CardDescription>Choose an imported conversation, a target speaker, and the local training mode.</CardDescription>
+              <CardDescription>Choose an imported conversation, a target speaker, and the local Qwen3-14B training mode.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -301,6 +308,9 @@ export default function TrainingPage() {
               <div className="space-y-2">
                 <Label htmlFor="training-model">Base Model</Label>
                 <Input id="training-model" value={baseModel} onChange={(event) => setBaseModel(event.target.value)} />
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Recommended for 16GB VRAM: Qwen/Qwen3-14B with Local QLoRA in WSL2 or Linux.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -336,9 +346,9 @@ export default function TrainingPage() {
                       <Badge>{job.backend}</Badge>
                     </div>
                     <p className="mt-3 font-medium">{job.name}</p>
-                    <p className="mt-2 text-sm text-[var(--muted-foreground)]">{job.base_model}</p>
+                    <p className="mt-2 text-sm text-[var(--muted-foreground)]">{job.baseModel}</p>
                     <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-                      train {job.train_examples} / val {job.validation_examples} / test {job.test_examples}
+                      train {job.trainExamples} / val {job.validationExamples} / test {job.testExamples}
                     </p>
                   </button>
                 ))
@@ -357,25 +367,21 @@ export default function TrainingPage() {
               {detail ? (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{detail.job.status}</Badge>
-                    <Badge>{detail.job.backend}</Badge>
-                    <Badge>{detail.job.source_speaker}</Badge>
+                    <Badge>{detail.status}</Badge>
+                    <Badge>{detail.backend}</Badge>
+                    <Badge>{detail.sourceSpeaker}</Badge>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <Button disabled={launching || detail.job.status === "running"} onClick={handleLaunchJob}>
-                      {launching ? "Launching..." : detail.job.status === "running" ? "Training Running" : "Launch Local Training"}
+                    <Button disabled={launching || detail.status === "running"} onClick={handleLaunchJob}>
+                      {launching ? "Launching..." : detail.status === "running" ? "Training Running" : "Launch Local Training"}
                     </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={registering || detail.job.status !== "completed"}
-                      onClick={handleRegisterProvider}
-                    >
+                    <Button variant="secondary" disabled={registering || detail.status !== "completed"} onClick={handleRegisterProvider}>
                       {registering ? "Registering..." : "Register Provider"}
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={async () => {
-                        await refresh(detail.job.id);
+                        await refresh(detail.id);
                       }}
                     >
                       Refresh Status
@@ -384,36 +390,36 @@ export default function TrainingPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
                       <p className="font-medium">Dataset</p>
-                      <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.job.dataset_path}</p>
+                      <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.datasetPath}</p>
                       <p className="mt-3 font-medium">Config</p>
-                      <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.job.config_path}</p>
+                      <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.configPath}</p>
                     </div>
                     <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
                       <p className="font-medium">Output</p>
-                      <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.job.output_dir}</p>
+                      <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.outputDir}</p>
                       <p className="mt-3 font-medium">Split</p>
                       <p className="mt-2 text-[var(--muted-foreground)]">
-                        train {detail.job.train_examples} / validation {detail.job.validation_examples} / test {detail.job.test_examples}
+                        train {detail.trainExamples} / validation {detail.validationExamples} / test {detail.testExamples}
                       </p>
                     </div>
                   </div>
-                  {detail.job.artifact_path ? (
+                  {detail.artifactPath ? (
                     <div className="rounded-[1rem] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                       <p className="font-medium">Adapter Artifact</p>
-                      <p className="mt-2 break-all">{detail.job.artifact_path}</p>
+                      <p className="mt-2 break-all">{detail.artifactPath}</p>
                     </div>
                   ) : null}
-                  {detail.registered_provider ? (
+                  {detail.registeredProvider ? (
                     <div className="rounded-[1rem] border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium">Registered Provider</p>
-                        <Badge>{detail.registered_provider.provider_type}</Badge>
-                        {detail.registered_provider.is_default ? <Badge>default</Badge> : null}
-                        {detail.registered_provider.is_enabled ? <Badge>enabled</Badge> : <Badge>disabled</Badge>}
+                        <Badge>{detail.registeredProvider.providerType}</Badge>
+                        {detail.registeredProvider.isDefault ? <Badge>default</Badge> : null}
+                        {detail.registeredProvider.isEnabled ? <Badge>enabled</Badge> : <Badge>disabled</Badge>}
                       </div>
-                      <p className="mt-2">{detail.registered_provider.name}</p>
-                      <p className="mt-2 break-all text-xs text-sky-700">{detail.registered_provider.base_url}</p>
-                      {!detail.registered_provider.is_default ? (
+                      <p className="mt-2">{detail.registeredProvider.name}</p>
+                      <p className="mt-2 break-all text-xs text-sky-700">{detail.registeredProvider.baseUrl}</p>
+                      {!detail.registeredProvider.isDefault ? (
                         <div className="mt-3">
                           <Button variant="secondary" disabled={loading} onClick={handleSetRegisteredProviderDefault}>
                             Set Registered Provider as Default
@@ -422,15 +428,15 @@ export default function TrainingPage() {
                       ) : null}
                     </div>
                   ) : null}
-                  {detail.job.error_message ? (
+                  {detail.errorMessage ? (
                     <div className="rounded-[1rem] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                       <p className="font-medium">Last Error</p>
-                      <p className="mt-2 whitespace-pre-wrap">{detail.job.error_message}</p>
+                      <p className="mt-2 whitespace-pre-wrap">{detail.errorMessage}</p>
                     </div>
                   ) : null}
                   <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
                     <p className="font-medium">Launcher Command</p>
-                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs leading-6">{detail.job.launcher_command}</pre>
+                    <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs leading-6">{detail.launcherCommand}</pre>
                   </div>
                 </>
               ) : (
