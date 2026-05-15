@@ -397,7 +397,9 @@ export interface ModelProviderValidationResult {
     arguments: Record<string, unknown>;
   }[];
   usage: Record<string, unknown>;
+  error_code?: string | null;
   error?: string | null;
+  recommendation?: string | null;
   checked_at: string;
 }
 
@@ -475,6 +477,7 @@ export interface AgentChatRequest {
   user_id: UUID;
   conversation_id?: UUID | null;
   persona_id?: UUID | null;
+  provider_id?: UUID | null;
   message: string;
   controls?: ConversationControls;
 }
@@ -495,6 +498,9 @@ export interface AgentDebugInfo {
   provider_name: string;
   model_name: string;
   model_mode: string;
+  model_think_enabled?: boolean | null;
+  model_think_gate?: string | null;
+  model_think_reason?: string | null;
   route_policy: string;
   fallback_policy: string;
   provider_fallback_used: boolean;

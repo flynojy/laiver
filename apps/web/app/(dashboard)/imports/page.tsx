@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, UploadCloud } from "lucide-react";
-
-import type { ImportSourceMetadata } from "@agent/shared";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { toImportPreviewViewModel, toImportSummaryCardViewModel } from "@/features/imports/mappers";
 import {
   bootstrapUser,
   commitImport,
@@ -17,34 +16,7 @@ import {
   previewImport,
   type ImportDetail,
   type ImportPreview
-} from "@/lib/api";
-
-function metadataEntries(metadata?: ImportSourceMetadata | Record<string, unknown>) {
-  const mapping = [
-    { key: "source_format", label: "Format" },
-    { key: "conversation_owner", label: "Owner" },
-    { key: "export_tool", label: "Export Tool" },
-    { key: "export_version", label: "Export Version" },
-    { key: "platform", label: "Platform" },
-    { key: "exported_at", label: "Exported At" }
-  ] as const;
-
-  const entries: Array<{ label: string; value: string }> = [];
-  for (const item of mapping) {
-    const value = metadata?.[item.key];
-    if (typeof value === "string" && value.trim()) {
-      entries.push({ label: item.label, value });
-    }
-  }
-  return entries;
-}
-
-function messageTypeBadges(metadata?: ImportSourceMetadata | Record<string, unknown>) {
-  const value = metadata?.message_types;
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    : [];
-}
+} from "@/features/imports/client";
 
 export default function ImportsPage() {
   const [userId, setUserId] = useState("");
@@ -54,6 +26,8 @@ export default function ImportsPage() {
   const [imports, setImports] = useState<ImportDetail[]>([]);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const previewView = useMemo(() => (preview ? toImportPreviewViewModel(preview) : null), [preview]);
+  const importCards = useMemo(() => imports.map(toImportSummaryCardViewModel), [imports]);
 
   useEffect(() => {
     async function bootstrap() {
@@ -149,27 +123,27 @@ export default function ImportsPage() {
               />
             </label>
 
-            {preview ? (
+            {previewView ? (
               <div className="rounded-[1.5rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
-                <p className="font-medium">{preview.file_name}</p>
+                <p className="font-medium">{previewView.fileName}</p>
                 <p className="mt-2 text-[var(--muted-foreground)]">
-                  {preview.total_messages} messages, participants: {preview.detected_participants.join(" / ") || "unknown"}
+                  {previewView.totalMessages} messages, participants: {previewView.participants.join(" / ") || "unknown"}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge>{preview.source_type.toUpperCase()}</Badge>
-                  <Badge>{preview.total_messages} messages</Badge>
-                  <Badge>{preview.detected_participants.length} speakers</Badge>
+                  <Badge>{previewView.sourceType.toUpperCase()}</Badge>
+                  <Badge>{previewView.totalMessages} messages</Badge>
+                  <Badge>{previewView.participants.length} speakers</Badge>
                 </div>
-                {messageTypeBadges(preview.source_metadata).length > 0 ? (
+                {previewView.messageTypeBadges.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {messageTypeBadges(preview.source_metadata).map((item) => (
+                    {previewView.messageTypeBadges.map((item) => (
                       <Badge key={item}>{item}</Badge>
                     ))}
                   </div>
                 ) : null}
-                {metadataEntries(preview.source_metadata).length > 0 ? (
+                {previewView.metadataEntries.length > 0 ? (
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    {metadataEntries(preview.source_metadata).map((entry) => (
+                    {previewView.metadataEntries.map((entry) => (
                       <div
                         key={entry.label}
                         className="rounded-xl border border-[color:var(--border)] bg-white px-3 py-2"
@@ -199,7 +173,7 @@ export default function ImportsPage() {
               <CardDescription>Confirm speaker, role, and content before the data enters the shared import registry.</CardDescription>
             </CardHeader>
             <CardContent>
-              {preview ? (
+              {previewView ? (
                 <div className="overflow-hidden rounded-[1.25rem] border border-[color:var(--border)]">
                   <Table>
                     <thead className="bg-[#faf8f4]">
@@ -211,9 +185,9 @@ export default function ImportsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {preview.normalized_messages.slice(0, 20).map((row) => (
-                        <TableRow key={`${row.sequence_index}-${row.speaker}`}>
-                          <TableCell>{row.sequence_index}</TableCell>
+                      {previewView.normalizedRows.slice(0, 20).map((row) => (
+                        <TableRow key={`${row.sequenceIndex}-${row.speaker}`}>
+                          <TableCell>{row.sequenceIndex}</TableCell>
                           <TableCell>{row.speaker}</TableCell>
                           <TableCell>{row.role}</TableCell>
                           <TableCell>{row.content}</TableCell>
@@ -236,39 +210,30 @@ export default function ImportsPage() {
               <CardDescription>Saved imports stay available here for Persona extraction and later inspection.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {imports.length === 0 ? (
+              {importCards.length === 0 ? (
                 <p className="text-sm text-[var(--muted-foreground)]">No imports committed yet.</p>
               ) : (
-                imports.map((item) => {
-                  const summary = item.import_job.normalized_summary ?? {};
-                  const participants = Array.isArray(summary.participants) ? summary.participants.join(" / ") : "unknown";
-                  const totalMessages =
-                    typeof summary.total_messages === "number" ? summary.total_messages : item.normalized_messages.length;
-
-                  return (
-                    <div
-                      key={item.import_job.id}
-                      className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{item.import_job.file_name}</p>
-                        <Badge>{item.import_job.status}</Badge>
-                        <Badge>{item.import_job.source_type}</Badge>
-                      </div>
-                      <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-                        {totalMessages} messages
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">Participants: {participants}</p>
-                      {metadataEntries(summary).length > 0 ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {metadataEntries(summary).map((entry) => (
-                            <Badge key={`${item.import_job.id}-${entry.label}`}>{`${entry.label}: ${entry.value}`}</Badge>
-                          ))}
-                        </div>
-                      ) : null}
+                importCards.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{item.fileName}</p>
+                      <Badge>{item.status}</Badge>
+                      <Badge>{item.sourceType}</Badge>
                     </div>
-                  );
-                })
+                    <p className="mt-2 text-sm text-[var(--muted-foreground)]">{item.totalMessages} messages</p>
+                    <p className="mt-1 text-sm text-[var(--muted-foreground)]">Participants: {item.participants}</p>
+                    {item.metadataEntries.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {item.metadataEntries.map((entry) => (
+                          <Badge key={`${item.id}-${entry.label}`}>{`${entry.label}: ${entry.value}`}</Badge>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>

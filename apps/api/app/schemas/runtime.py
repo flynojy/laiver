@@ -243,7 +243,9 @@ class ModelProviderValidationResponse(BaseModel):
     stream_preview: str = ""
     tool_calls: list["ModelToolCall"] = Field(default_factory=list)
     usage: dict[str, Any] = Field(default_factory=dict)
+    error_code: str | None = None
     error: str | None = None
+    recommendation: str | None = None
     checked_at: datetime
 
 
