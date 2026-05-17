@@ -74,9 +74,9 @@ function completedStep(current: OnboardingStep, target: OnboardingStep) {
 
 function StepBadge({ done, active }: { done: boolean; active: boolean }) {
   if (done) {
-    return <CheckCircle2 className="h-5 w-5 text-emerald-600" />;
+    return <CheckCircle2 className="h-5 w-5 text-[var(--success)]" />;
   }
-  return <span className={active ? "h-3 w-3 rounded-full bg-[var(--accent)]" : "h-3 w-3 rounded-full bg-[#d7d4ce]"} />;
+  return <span className={active ? "h-3 w-3 rounded-full bg-[var(--accent)]" : "h-3 w-3 rounded-full bg-[color:var(--border-strong)]"} />;
 }
 
 export default function OnboardingPage() {
@@ -277,11 +277,11 @@ export default function OnboardingPage() {
         badge="Import -> Persona -> Training -> Chat"
       />
 
-      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-md border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
+      {status ? <div className="rounded-md border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="bg-white/88">
+        <Card className="bg-[var(--surface)]">
           <CardHeader>
             <CardTitle>Run Order</CardTitle>
             <CardDescription>Finish each step once, then keep refining from the dedicated pages.</CardDescription>
@@ -295,7 +295,7 @@ export default function OnboardingPage() {
             ].map((item) => (
               <button
                 key={item.key}
-                className="flex w-full items-start gap-3 rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-left"
+                className="flex w-full items-start gap-3 rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-left"
                 onClick={() => setStep(item.key)}
               >
                 <div className="mt-1">
@@ -312,7 +312,7 @@ export default function OnboardingPage() {
 
         <div className="space-y-4">
           {step === "import" ? (
-            <Card className="bg-white/88">
+            <Card className="bg-[var(--surface)]">
               <CardHeader>
                 <CardTitle>Import Chat Archive</CardTitle>
                 <CardDescription>Use txt, csv, json, or WeFlow-style WeChat xlsx exports.</CardDescription>
@@ -342,7 +342,7 @@ export default function OnboardingPage() {
                     </div>
                     <div className="overflow-hidden rounded-md border border-[color:var(--border)]">
                       <Table>
-                        <thead className="bg-[#faf8f4]">
+                        <thead className="bg-[var(--surface-2)]">
                           <tr>
                             <TableHead>#</TableHead>
                             <TableHead>Speaker</TableHead>
@@ -364,13 +364,13 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 ) : imports.length > 0 ? (
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
                     <p className="font-medium">Recent imports</p>
                     <div className="mt-3 space-y-2">
                       {imports.slice(0, 3).map((item) => (
                         <button
                           key={item.import_job.id}
-                          className="w-full rounded-md border border-[color:var(--border)] bg-white px-3 py-2 text-left"
+                          className="w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 py-2 text-left"
                           onClick={() => {
                             setCommittedImport(item);
                             setStep("persona");
@@ -392,7 +392,7 @@ export default function OnboardingPage() {
           ) : null}
 
           {step === "persona" ? (
-            <Card className="bg-white/88">
+            <Card className="bg-[var(--surface)]">
               <CardHeader>
                 <CardTitle>Create Persona</CardTitle>
                 <CardDescription>Choose the speaker whose style laiver should learn.</CardDescription>
@@ -405,7 +405,7 @@ export default function OnboardingPage() {
                     <div className="space-y-2">
                       <Label>Import</Label>
                       <select
-                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
                         value={committedImport.import_job.id}
                         onChange={(event) => {
                           const next = imports.find((item) => item.import_job.id === event.target.value) ?? null;
@@ -422,7 +422,7 @@ export default function OnboardingPage() {
                     <div className="space-y-2">
                       <Label>Target Speaker</Label>
                       <select
-                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
                         value={selectedSpeaker}
                         onChange={(event) => setSelectedSpeaker(event.target.value)}
                       >
@@ -434,7 +434,7 @@ export default function OnboardingPage() {
                       </select>
                     </div>
                     {persona ? (
-                      <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                      <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
                         <div className="flex flex-wrap gap-2">
                           <Badge>{persona.tone}</Badge>
                           <Badge>{persona.verbosity}</Badge>
@@ -444,7 +444,7 @@ export default function OnboardingPage() {
                         <p className="mt-2 text-[var(--muted-foreground)]">{persona.description || "Persona ready."}</p>
                       </div>
                     ) : personas.length > 0 ? (
-                      <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                      <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
                         <p className="font-medium">Existing Personas</p>
                         <p className="mt-2 text-[var(--muted-foreground)]">{personas.length} saved Persona records.</p>
                       </div>
@@ -460,7 +460,7 @@ export default function OnboardingPage() {
           ) : null}
 
           {step === "training" ? (
-            <Card className="bg-white/88">
+            <Card className="bg-[var(--surface)]">
               <CardHeader>
                 <CardTitle>Prepare Fine-Tuning</CardTitle>
                 <CardDescription>Create a local QLoRA dataset from the committed chat archive.</CardDescription>
@@ -475,7 +475,7 @@ export default function OnboardingPage() {
                   <Input value={baseModel} onChange={(event) => setBaseModel(event.target.value)} />
                 </div>
                 {trainingJob ? (
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
                     <div className="flex flex-wrap gap-2">
                       <Badge>{trainingJob.job.status}</Badge>
                       <Badge>{trainingJob.job.backend}</Badge>
@@ -503,18 +503,18 @@ export default function OnboardingPage() {
           ) : null}
 
           {step === "runtime" ? (
-            <Card className="bg-white/88">
+            <Card className="bg-[var(--surface)]">
               <CardHeader>
                 <CardTitle>Ready Runtime</CardTitle>
                 <CardDescription>Seed skills, create a default model provider, then start chatting.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4">
                     <p className="text-sm font-medium">Model Providers</p>
                     <p className="mt-2 text-2xl font-semibold">{providerCount}</p>
                   </div>
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4">
                     <p className="text-sm font-medium">Seeded Skills</p>
                     <p className="mt-2 text-2xl font-semibold">{skillCount}</p>
                   </div>
@@ -526,7 +526,7 @@ export default function OnboardingPage() {
                   </Button>
                   <Link
                     href="/chat"
-                    className="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:bg-[var(--muted)]"
+                    className="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:bg-[var(--muted)]"
                   >
                     Start Chat
                   </Link>

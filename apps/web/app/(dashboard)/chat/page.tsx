@@ -38,7 +38,7 @@ function MemoryList({ memories }: { memories: MemoryRecord[] }) {
   return (
     <div className="space-y-3">
       {memories.map((memory) => (
-        <div key={memory.id} className="rounded-2xl border border-[color:var(--border)] bg-[#fffdf9] p-3">
+        <div key={memory.id} className="rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] p-3">
           <div className="flex flex-wrap gap-2">
             <Badge>{memory.memory_type}</Badge>
             <Badge>{String(memory.metadata?.memory_label ?? "unknown")}</Badge>
@@ -161,11 +161,19 @@ export default function ChatPage() {
         badge="Controls + Explanation"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? (
+        <div className="rounded-[4px] border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 font-mono text-xs uppercase tracking-[0.12em] text-[var(--danger)]">
+          ▶ ALERT — {error}
+        </div>
+      ) : null}
+      {status ? (
+        <div className="rounded-[4px] border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 font-mono text-xs uppercase tracking-[0.12em] text-[var(--success)]">
+          ● {status}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_380px]">
-        <Card className="bg-white/88">
+        <Card>
           <CardHeader>
             <CardTitle>Conversation Controls</CardTitle>
             <CardDescription>Set persona and runtime switches before sending the next turn.</CardDescription>
@@ -174,7 +182,7 @@ export default function ChatPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Current Persona</label>
               <select
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                className="w-full rounded-[4px] border border-[color:var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
                 value={selectedPersonaId}
                 onChange={async (event) => {
                   const nextPersonaId = event.target.value;
@@ -194,7 +202,7 @@ export default function ChatPage() {
               </select>
             </div>
 
-            <div className="space-y-3 rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+            <div className="space-y-3 rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Skills</p>
@@ -254,7 +262,7 @@ export default function ChatPage() {
                 conversations.map((conversation) => (
                   <button
                     key={conversation.id}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--muted)]/50 px-4 py-3 text-left"
+                    className="w-full rounded-[6px] border border-[color:var(--border)] bg-[var(--surface-2)] px-4 py-3 text-left transition hover:border-[color:var(--border-strong)]"
                     onClick={() => {
                       loadConversation(conversation.id, conversation.persona_id ?? undefined).catch(() => undefined);
                       setLastRun(null);
@@ -271,7 +279,7 @@ export default function ChatPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/88">
+        <Card>
           <CardHeader>
             <CardTitle>{activeConversation?.conversation.title ?? "New Conversation"}</CardTitle>
             <CardDescription>
@@ -280,24 +288,27 @@ export default function ChatPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {activeConversation?.conversation.summary ? (
-              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
                   Long-Horizon Summary
                 </p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{activeConversation.conversation.summary}</p>
               </div>
             ) : null}
-            <div className="max-h-[560px] space-y-3 overflow-y-auto rounded-[1.5rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+            <div className="max-h-[560px] space-y-3 overflow-y-auto rounded-[1.5rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
               {activeConversation?.messages.length ? (
                 activeConversation.messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`rounded-3xl px-4 py-3 text-sm leading-6 ${
+                    className={`rounded-[8px] border px-4 py-3 text-sm leading-6 ${
                       message.role === "user"
-                        ? "ml-auto max-w-[75%] bg-slate-900 text-white"
-                        : "max-w-[82%] bg-white text-[var(--foreground)]"
+                        ? "ml-auto max-w-[75%] border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                        : "max-w-[82%] border-[color:var(--border)] bg-[var(--surface)] text-[var(--foreground)]"
                     }`}
                   >
+                    <p className={`mb-1 font-mono text-[9px] uppercase tracking-[0.18em] ${message.role === "user" ? "text-[var(--accent-foreground)]/60" : "text-[var(--foreground-muted)]"}`}>
+                      {message.role === "user" ? "PILOT" : "MAGI // 02"}
+                    </p>
                     {message.content}
                   </div>
                 ))
@@ -308,7 +319,7 @@ export default function ChatPage() {
               )}
             </div>
 
-            <div className="space-y-3 rounded-[1.5rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+            <div className="space-y-3 rounded-[1.5rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
               <div className="flex flex-wrap gap-2">
                 <Badge>{selectedPersonaId ? "persona selected" : "no persona"}</Badge>
                 <Badge>{controls.skills_enabled ? "skills on" : "skills off"}</Badge>
@@ -330,7 +341,7 @@ export default function ChatPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/88">
+        <Card>
           <CardHeader>
             <CardTitle>Debug Panel</CardTitle>
             <CardDescription>This panel consumes the shared `AgentChatResponse.debug` schema directly.</CardDescription>
@@ -339,7 +350,7 @@ export default function ChatPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Current Persona</label>
               {currentPersona ? (
-                <div className="rounded-2xl bg-[#faf8f4] p-4">
+                <div className="rounded-2xl bg-[var(--surface-2)] p-4">
                   <div className="flex flex-wrap gap-2">
                     <Badge>{currentPersona.name}</Badge>
                     <Badge>{currentPersona.tone}</Badge>
@@ -397,7 +408,7 @@ export default function ChatPage() {
                     <Badge>{lastRun.debug.recent_message_count} recent kept</Badge>
                   </div>
                   {lastRun.debug.conversation_summary ? (
-                    <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+                    <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
                       {lastRun.debug.conversation_summary}
                     </pre>
                   ) : (
@@ -454,7 +465,7 @@ export default function ChatPage() {
                 lastRun.debug.explanation.skill_outputs_used.length > 0 ? (
                   <div className="space-y-2">
                     {lastRun.debug.explanation.skill_outputs_used.map((item) => (
-                      <div key={item} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
+                      <div key={item} className="rounded-2xl bg-[var(--surface-2)] p-3 text-sm leading-6">
                         {item}
                       </div>
                     ))}
@@ -473,17 +484,19 @@ export default function ChatPage() {
                 lastRun.debug.skill_invocations.length > 0 ? (
                   <div className="space-y-3">
                     {lastRun.debug.skill_invocations.map((invocation) => (
-                      <div key={invocation.invocation_id} className="rounded-2xl border border-[color:var(--border)] bg-[#fffdf9] p-3">
+                      <div key={invocation.invocation_id} className="rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] p-3">
                         <div className="flex flex-wrap gap-2">
                           <Badge>{invocation.skill_slug}</Badge>
                           <Badge>{invocation.tool_name}</Badge>
                           <Badge>{invocation.status}</Badge>
                         </div>
-                        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+                        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
                           {JSON.stringify(invocation.output, null, 2)}
                         </pre>
                         {invocation.error ? (
-                          <p className="mt-2 text-xs text-red-600">{invocation.error}</p>
+                          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--danger)]">
+                            ▶ {invocation.error}
+                          </p>
                         ) : null}
                       </div>
                     ))}

@@ -9,11 +9,10 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        "min-h-[120px] w-full rounded-3xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)] focus:border-slate-400",
+        "min-h-[120px] w-full rounded-[4px] border border-[color:var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none transition placeholder:font-mono placeholder:text-xs placeholder:text-[var(--foreground-muted)] focus:border-[var(--accent)] focus:outline focus:outline-1 focus:outline-[var(--accent)] focus:[outline-offset:-1px]",
         className
       )}
       {...props}
     />
   );
 }
-

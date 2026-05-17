@@ -199,10 +199,10 @@ export default function SettingsPage() {
         badge="External + Local"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card className="bg-white/88">
+        <Card className="bg-[var(--surface)]">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
               <CardTitle>Provider Registry</CardTitle>
@@ -233,7 +233,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {providers.map((provider) => (
-              <div key={provider.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+              <div key={provider.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
                 {provider.provider_type === "local_adapter" && provider.id ? (
                   (() => {
                     const runtimeState = runtimeStateByProviderId.get(provider.id);
@@ -262,7 +262,7 @@ export default function SettingsPage() {
                             last eviction: {runtimeState.last_eviction_reason}
                           </p>
                         ) : null}
-                        {runtimeState.error ? <p className="mt-1 text-red-700">{runtimeState.error}</p> : null}
+                        {runtimeState.error ? <p className="mt-1 text-[var(--danger)]">{runtimeState.error}</p> : null}
                       </div>
                     ) : null;
                   })()
@@ -323,7 +323,7 @@ export default function SettingsPage() {
             onValidate={handleValidate}
           />
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Add Provider</CardTitle>
               <CardDescription>
@@ -335,7 +335,7 @@ export default function SettingsPage() {
                 <Label htmlFor="provider-type">Provider Type</Label>
                 <select
                   id="provider-type"
-                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
                   value={form.provider_type}
                   onChange={(event) => setForm(buildPresetForm(event.target.value as ManualProviderType))}
                 >
@@ -410,7 +410,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Validation Result</CardTitle>
               <CardDescription>Check completion, streaming, and tool-calling support before switching the agent to a new model.</CardDescription>
@@ -447,13 +447,13 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <p className="font-medium text-[color:var(--foreground)]">Tool Calls</p>
-                      <pre className="mt-1 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 leading-6">
+                      <pre className="mt-1 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 leading-6">
                         {JSON.stringify(validation.tool_calls, null, 2)}
                       </pre>
                     </div>
                   </div>
                   {validation.error ? (
-                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <p className="rounded-2xl border border-[var(--warning)] bg-[color:var(--warning)]/10 px-3 py-2 text-xs text-[var(--warning)]">
                       {validation.error}
                     </p>
                   ) : null}
@@ -468,7 +468,7 @@ export default function SettingsPage() {
           </Card>
 
           {activeProvider?.provider_type === "local_adapter" && activeProvider.id ? (
-            <Card className="bg-white/88">
+            <Card className="bg-[var(--surface)]">
               <CardHeader>
                 <CardTitle>Resident Runtime</CardTitle>
                 <CardDescription>Keep the selected local adapter warm in memory so reply latency stays stable between turns.</CardDescription>

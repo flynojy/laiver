@@ -26,6 +26,14 @@ function statusLabel(provider: ModelProviderConfig, validation: ModelProviderVal
   return provider.is_default ? "current" : "available";
 }
 
+function statusVariant(label: string): "sync" | "standby" | "alert" | "idle" | "default" {
+  if (label === "healthy" || label === "current") return "sync";
+  if (label === "available") return "standby";
+  if (label === "degraded") return "standby";
+  if (label === "unhealthy" || label === "disabled") return "alert";
+  return "default";
+}
+
 export function ModelSwitcher({
   providers,
   selectedProviderId,
@@ -41,26 +49,32 @@ export function ModelSwitcher({
     validation && validation.provider_id === defaultProvider?.id ? validation : null;
 
   return (
-    <Card className="bg-white/88">
+    <Card>
       <CardHeader>
         <CardTitle>Model Switcher</CardTitle>
-        <CardDescription>Switch the agent default provider after checking health and fallback status.</CardDescription>
+        <CardDescription>
+          Switch the agent default provider after checking health and fallback status.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg border border-[color:var(--border)] bg-[#faf8f4] p-4">
+        <div className="rounded-[8px] border border-[color:var(--border-strong)] bg-[var(--surface-2)] p-4">
           <div className="flex flex-wrap gap-2">
-            <Badge>current</Badge>
+            <Badge variant="alert">current</Badge>
             {defaultProvider ? <Badge>{defaultProvider.provider_type}</Badge> : null}
-            {defaultValidation ? <Badge>{defaultValidation.health_status}</Badge> : null}
+            {defaultValidation ? (
+              <Badge variant={statusVariant(defaultValidation.health_status)}>
+                {defaultValidation.health_status}
+              </Badge>
+            ) : null}
           </div>
           <p className="mt-3 font-medium">{defaultProvider?.name ?? "No default provider"}</p>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+          <p className="mt-1 font-mono text-xs text-[var(--foreground-muted)]">
             {defaultProvider ? defaultProvider.model_name : "Create or bootstrap a provider before switching."}
           </p>
           {defaultValidation ? (
-            <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-              fallback {defaultValidation.fallback_policy}{" "}
-              {defaultValidation.fallback_available ? "available" : "unavailable"}
+            <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--foreground-muted)]">
+              FALLBACK {defaultValidation.fallback_policy}{" "}
+              {defaultValidation.fallback_available ? "AVAILABLE" : "UNAVAILABLE"}
             </p>
           ) : null}
         </div>
@@ -74,8 +88,10 @@ export function ModelSwitcher({
                 key={provider.id}
                 type="button"
                 className={[
-                  "w-full rounded-lg border p-3 text-left transition",
-                  isSelected ? "border-[var(--accent)] bg-white" : "border-[color:var(--border)] bg-[#faf8f4]"
+                  "w-full rounded-[8px] border p-3 text-left transition",
+                  isSelected
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                    : "border-[color:var(--border)] bg-[var(--surface-2)] hover:border-[color:var(--border-strong)]"
                 ].join(" ")}
                 onClick={() => provider.id && onSelect(provider.id)}
               >
@@ -83,16 +99,21 @@ export function ModelSwitcher({
                   <div>
                     <div className="flex flex-wrap gap-2">
                       <Badge>{provider.provider_type}</Badge>
-                      <Badge>{statusLabel(provider, validation)}</Badge>
-                      {provider.is_default ? <Badge>default</Badge> : null}
+                      <Badge variant={statusVariant(statusLabel(provider, validation))}>
+                        {statusLabel(provider, validation)}
+                      </Badge>
+                      {provider.is_default ? <Badge variant="alert">default</Badge> : null}
                     </div>
                     <p className="mt-2 font-medium">{provider.name}</p>
-                    <p className="mt-1 text-xs text-[var(--muted-foreground)]">{provider.model_name}</p>
+                    <p className="mt-1 font-mono text-xs text-[var(--foreground-muted)]">
+                      {provider.model_name}
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
                       variant="secondary"
+                      size="sm"
                       disabled={loading || !provider.id}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -106,6 +127,7 @@ export function ModelSwitcher({
                     {canSwitch ? (
                       <Button
                         type="button"
+                        size="sm"
                         disabled={loading}
                         onClick={(event) => {
                           event.stopPropagation();
