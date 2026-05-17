@@ -37,7 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto flex min-h-screen max-w-[1600px] gap-6 px-4 py-4 sm:px-6">
-        <aside className="hidden w-[280px] shrink-0 flex-col rounded-[2rem] border border-white/60 bg-[linear-gradient(180deg,#102a43_0%,#173f5f_50%,#f3efe7_100%)] p-5 text-white shadow-panel lg:flex">
+        <aside className="hidden w-[280px] shrink-0 flex-col rounded-[2rem] border border-white/60 bg-gradient-to-b from-sidebarFrom via-sidebarVia to-sidebarTo p-5 text-white shadow-panel lg:flex">
           <div className="rounded-[1.5rem] bg-white/10 p-5 backdrop-blur">
             <p className="text-xs uppercase tracking-[0.3em] text-white/70">Personal Agent</p>
             <h1 className="mt-3 text-2xl font-semibold">MVP Validation Console</h1>

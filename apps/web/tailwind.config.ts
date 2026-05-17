@@ -17,7 +17,10 @@ const config: Config = {
         accent: "var(--accent)",
         accentForeground: "var(--accent-foreground)",
         muted: "var(--muted)",
-        mutedForeground: "var(--muted-foreground)"
+        mutedForeground: "var(--muted-foreground)",
+        sidebarFrom: "var(--sidebar-from)",
+        sidebarVia: "var(--sidebar-via)",
+        sidebarTo: "var(--sidebar-to)"
       },
       boxShadow: {
         panel: "0 20px 60px rgba(15, 23, 42, 0.08)"
