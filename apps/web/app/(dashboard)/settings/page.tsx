@@ -197,10 +197,10 @@ export default function SettingsPage() {
         badge="External + Local"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card className="bg-white/88">
+        <Card className="bg-[var(--surface)]">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
               <CardTitle>Provider Registry</CardTitle>
@@ -293,7 +293,7 @@ export default function SettingsPage() {
             onValidate={handleValidate}
           />
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Add Provider</CardTitle>
               <CardDescription>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Validation Result</CardTitle>
               <CardDescription>Check completion, streaming, and tool-calling support before switching the agent to a new model.</CardDescription>

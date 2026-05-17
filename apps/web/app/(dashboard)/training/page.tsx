@@ -45,7 +45,7 @@ function DatasetPreview({ detail }: { detail: TrainingJobDetailViewModel | null 
           <p className="text-sm font-medium">{sample.label}</p>
           <div className="mt-3 space-y-2 text-sm">
             {sample.messages.map((message, messageIndex) => (
-              <div key={messageIndex} className="rounded-md bg-white px-3 py-2">
+              <div key={messageIndex} className="rounded-md bg-[var(--surface)] px-3 py-2">
                 <p className="text-xs uppercase tracking-[0.15em] text-[var(--muted-foreground)]">{message.role}</p>
                 <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
               </div>
@@ -226,8 +226,8 @@ export default function TrainingPage() {
         badge="Dataset + Model"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
+      {status ? <div className="rounded-2xl border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">{status}</div> : null}
 
       <Card className="bg-white/88">
         <CardHeader>
@@ -249,7 +249,7 @@ export default function TrainingPage() {
 
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
         <div className="space-y-4">
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Create Job</CardTitle>
               <CardDescription>Choose an imported conversation, a target speaker, and the local Qwen3-14B training mode.</CardDescription>
@@ -259,7 +259,7 @@ export default function TrainingPage() {
                 <Label htmlFor="training-import">Source Import</Label>
                 <select
                   id="training-import"
-                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
                   value={selectedImportId}
                   onChange={(event) => setSelectedImportId(event.target.value)}
                 >
@@ -275,7 +275,7 @@ export default function TrainingPage() {
                 <Label htmlFor="training-speaker">Target Speaker</Label>
                 <select
                   id="training-speaker"
-                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
                   value={selectedSpeaker}
                   onChange={(event) => setSelectedSpeaker(event.target.value)}
                 >
@@ -296,7 +296,7 @@ export default function TrainingPage() {
                 <Label htmlFor="training-backend">Training Backend</Label>
                 <select
                   id="training-backend"
-                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
                   value={backend}
                   onChange={(event) => setBackend(event.target.value as "local_lora" | "local_qlora")}
                 >
@@ -324,7 +324,7 @@ export default function TrainingPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Jobs</CardTitle>
               <CardDescription>Generated datasets stay local and can be reused for later training runs.</CardDescription>
@@ -336,7 +336,7 @@ export default function TrainingPage() {
                 jobs.map((job) => (
                   <button
                     key={job.id}
-                    className="w-full rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
+                    className="w-full rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] px-4 py-4 text-left"
                     onClick={async () => {
                       await refreshJobDetail(job.id);
                     }}
@@ -358,7 +358,7 @@ export default function TrainingPage() {
         </div>
 
         <div className="space-y-4">
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Job Detail</CardTitle>
               <CardDescription>Inspect the dataset, launch the local runner, and watch the finished adapter register into the model registry.</CardDescription>
@@ -388,13 +388,13 @@ export default function TrainingPage() {
                     </Button>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+                    <div className="rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4 text-sm">
                       <p className="font-medium">Dataset</p>
                       <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.datasetPath}</p>
                       <p className="mt-3 font-medium">Config</p>
                       <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.configPath}</p>
                     </div>
-                    <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+                    <div className="rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4 text-sm">
                       <p className="font-medium">Output</p>
                       <p className="mt-2 break-all text-[var(--muted-foreground)]">{detail.outputDir}</p>
                       <p className="mt-3 font-medium">Split</p>
@@ -434,7 +434,7 @@ export default function TrainingPage() {
                       <p className="mt-2 whitespace-pre-wrap">{detail.errorMessage}</p>
                     </div>
                   ) : null}
-                  <div className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+                  <div className="rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4 text-sm">
                     <p className="font-medium">Launcher Command</p>
                     <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs leading-6">{detail.launcherCommand}</pre>
                   </div>
@@ -445,7 +445,7 @@ export default function TrainingPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Dataset Preview</CardTitle>
               <CardDescription>The last assistant message in each sample is the target speaker response used for fine-tuning.</CardDescription>

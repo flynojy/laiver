@@ -13,7 +13,7 @@ export function TableHead({
   return (
     <th
       className={cn(
-        "px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]",
+        "px-4 py-3 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--foreground-muted)]",
         className
       )}
       {...props}
@@ -26,7 +26,13 @@ export function TableRow({
   ...props
 }: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
-    <tr className={cn("border-t border-[color:var(--border)] align-top", className)} {...props} />
+    <tr
+      className={cn(
+        "border-t border-[color:var(--border)] align-top transition hover:bg-[var(--accent-soft)]",
+        className
+      )}
+      {...props}
+    />
   );
 }
 
@@ -34,6 +40,5 @@ export function TableCell({
   className,
   ...props
 }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("px-4 py-4 text-sm", className)} {...props} />;
+  return <td className={cn("px-4 py-4 text-sm tabular-nums", className)} {...props} />;
 }
-

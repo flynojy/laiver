@@ -31,13 +31,15 @@ export function ModelSwitcher({
   const defaultValidation = validation && validation.providerId === defaultProvider?.id ? validation : null;
 
   return (
-    <Card className="bg-white/88">
+    <Card>
       <CardHeader>
         <CardTitle>Model Switcher</CardTitle>
-        <CardDescription>Switch the agent default provider after checking health and fallback status.</CardDescription>
+        <CardDescription>
+          Switch the agent default provider after checking health and fallback status.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg border border-[color:var(--border)] bg-[#faf8f4] p-4">
+        <div className="rounded-[8px] border border-[color:var(--border-strong)] bg-[var(--surface-2)] p-4">
           <div className="flex flex-wrap gap-2">
             <Badge>current</Badge>
             {defaultProvider ? <Badge>{defaultProvider.providerType}</Badge> : null}
@@ -63,8 +65,10 @@ export function ModelSwitcher({
                 key={provider.id}
                 type="button"
                 className={[
-                  "w-full rounded-lg border p-3 text-left transition",
-                  isSelected ? "border-[var(--accent)] bg-white" : "border-[color:var(--border)] bg-[#faf8f4]"
+                  "w-full rounded-[8px] border p-3 text-left transition",
+                  isSelected
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                    : "border-[color:var(--border)] bg-[var(--surface-2)] hover:border-[color:var(--border-strong)]"
                 ].join(" ")}
                 onClick={() => provider.id && onSelect(provider.id)}
               >
@@ -82,6 +86,7 @@ export function ModelSwitcher({
                     <Button
                       type="button"
                       variant="secondary"
+                      size="sm"
                       disabled={loading || !provider.id}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -95,6 +100,7 @@ export function ModelSwitcher({
                     {canSwitch ? (
                       <Button
                         type="button"
+                        size="sm"
                         disabled={loading}
                         onClick={(event) => {
                           event.stopPropagation();

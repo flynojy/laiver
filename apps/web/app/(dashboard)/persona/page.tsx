@@ -170,11 +170,11 @@ export default function PersonaPage() {
         badge="Evidence + Preview"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
+      {status ? <div className="rounded-2xl border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <Card className="bg-white/88">
+        <Card className="bg-[var(--surface)]">
           <CardHeader>
             <CardTitle>Extract Persona</CardTitle>
             <CardDescription>Choose an import and optionally pick the speaker whose style you want to model.</CardDescription>
@@ -183,7 +183,7 @@ export default function PersonaPage() {
             <div className="space-y-2">
               <Label>Import Source</Label>
               <select
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] px-4 py-3 text-sm"
                 value={selectedImportId}
                 onChange={(event) => setSelectedImportId(event.target.value)}
               >
@@ -198,7 +198,7 @@ export default function PersonaPage() {
             <div className="space-y-2">
               <Label>Target Speaker</Label>
               <select
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] px-4 py-3 text-sm"
                 value={selectedSourceSpeaker}
                 onChange={(event) => setSelectedSourceSpeaker(event.target.value)}
               >
@@ -212,7 +212,7 @@ export default function PersonaPage() {
             </div>
 
             {speakerOptions.length > 0 ? (
-              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4 text-sm">
                 <p className="font-medium">Speaker Summary</p>
                 <div className="mt-3 space-y-2">
                   {speakerOptions.map((option) => (
@@ -240,7 +240,7 @@ export default function PersonaPage() {
                 personaListItems.map((persona) => (
                   <button
                     key={persona.id}
-                    className="w-full rounded-2xl border border-[color:var(--border)] bg-[#faf8f4] px-4 py-3 text-left"
+                    className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--surface-2)] px-4 py-3 text-left"
                     onClick={() => {
                       const selected = personas.find((item) => item.id === persona.id) ?? null;
                       setSavedPersona(selected);
@@ -262,7 +262,7 @@ export default function PersonaPage() {
         </Card>
 
         <div className="space-y-4">
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Extraction Details</CardTitle>
               <CardDescription>Field-level evidence and confidence for the currently selected Persona.</CardDescription>
@@ -292,13 +292,13 @@ export default function PersonaPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Confidence Scores</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.confidence_scores ?? {}, null, 2)}
                       </pre>
                     </div>
                     <div className="space-y-2">
                       <Label>Field Evidence</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.evidence_samples ?? {}, null, 2)}
                       </pre>
                     </div>
@@ -307,13 +307,13 @@ export default function PersonaPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Response Style</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.response_style ?? {}, null, 2)}
                       </pre>
                     </div>
                     <div className="space-y-2">
                       <Label>Relationship Style</Label>
-                      <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-4 text-xs leading-6">
                         {JSON.stringify(draftPersona.relationship_style ?? {}, null, 2)}
                       </pre>
                     </div>
@@ -325,7 +325,7 @@ export default function PersonaPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Edit Persona</CardTitle>
               <CardDescription>Key fields auto-save shortly after changes so you can tune the Persona and compare the preview immediately.</CardDescription>
@@ -404,7 +404,7 @@ export default function PersonaPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Answer Preview / Compare</CardTitle>
               <CardDescription>Compare the saved Persona against the current edited draft before the next conversation turn.</CardDescription>

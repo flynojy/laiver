@@ -39,7 +39,7 @@ function InvocationList({ invocations }: { invocations: ReturnType<typeof toSkil
           <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
             {item.outputJson}
           </pre>
-          {item.error ? <p className="mt-2 text-xs text-red-600">{item.error}</p> : null}
+          {item.error ? <p className="mt-2 text-xs text-[var(--danger)]">{item.error}</p> : null}
         </div>
       ))}
     </div>
@@ -148,12 +148,12 @@ export default function SkillsPage() {
         badge="Builtin + Community"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
+      {status ? <div className="rounded-2xl border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <div className="space-y-4">
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
                 <CardTitle>Registered Skills</CardTitle>
@@ -205,7 +205,7 @@ export default function SkillsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Install Community Skill</CardTitle>
               <CardDescription>
@@ -218,9 +218,9 @@ export default function SkillsPage() {
                 type="file"
                 accept=".json,.zip,application/json,application/zip"
                 onChange={(event) => setSelectedPackage(event.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-[var(--muted-foreground)] file:mr-4 file:rounded-md file:border-0 file:bg-[#faf8f4] file:px-4 file:py-2 file:text-sm file:font-medium"
+                className="block w-full text-sm text-[var(--muted-foreground)] file:mr-4 file:rounded-md file:border-0 file:bg-[var(--surface-2)] file:px-4 file:py-2 file:text-sm file:font-medium"
               />
-              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm text-[var(--muted-foreground)]">
+              <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4 text-sm text-[var(--muted-foreground)]">
                 <p>Selected package: {selectedPackage?.name ?? "none"}</p>
                 <p className="mt-2">Current approved handlers: `memory-search`, `task-extractor`.</p>
               </div>
@@ -232,7 +232,7 @@ export default function SkillsPage() {
         </div>
 
         <div className="space-y-4">
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Skill Detail</CardTitle>
               <CardDescription>Inspect the installed manifest, runtime config, and execution mode for the selected skill.</CardDescription>
@@ -278,7 +278,7 @@ export default function SkillsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Recent Invocations</CardTitle>
               <CardDescription>Actual runtime calls logged by the backend skill registry.</CardDescription>

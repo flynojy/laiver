@@ -3,14 +3,73 @@
 @tailwind utilities;
 
 :root {
-  --background: #f6f1e8;
-  --foreground: #102a43;
-  --card: rgba(255, 255, 255, 0.86);
-  --border: rgba(15, 23, 42, 0.1);
-  --accent: #0f766e;
-  --accent-foreground: #f8fafc;
-  --muted: #e9e3d8;
-  --muted-foreground: #52606d;
+  --background: #f4efe3;
+  --surface: #ffffff;
+  --surface-2: #faf6ec;
+  --foreground: #0b1220;
+  --foreground-muted: #5a6478;
+  --border: rgba(11, 18, 32, 0.08);
+  --border-strong: rgba(11, 18, 32, 0.18);
+
+  --accent: #dc2a1e;
+  --accent-foreground: #ffffff;
+  --accent-soft: #ffe7e3;
+
+  --warning: #e8a317;
+  --danger: #c8102e;
+  --success: #5a8f2e;
+
+  --halo-primary: 220, 42, 30;
+  --halo-secondary: 11, 18, 32;
+
+  --sidebar-bg: #0b0f1a;
+  --sidebar-fg: #f4efe3;
+  --sidebar-accent: #ff4520;
+  --sidebar-muted: rgba(244, 239, 227, 0.55);
+  --sidebar-border: rgba(244, 239, 227, 0.08);
+
+  --shadow-panel: 0 10px 30px rgba(11, 18, 32, 0.06);
+  --shadow-hover: 0 0 0 1px var(--accent), 0 10px 30px rgba(220, 42, 30, 0.18);
+
+  --notch: 14px;
+
+  --card: var(--surface);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--foreground-muted);
+
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0a0b10;
+  --surface: #13141b;
+  --surface-2: #1a1b24;
+  --foreground: #f4efe3;
+  --foreground-muted: #8a8fa3;
+  --border: rgba(244, 239, 227, 0.08);
+  --border-strong: rgba(220, 42, 30, 0.32);
+
+  --accent: #ff4520;
+  --accent-foreground: #0a0b10;
+  --accent-soft: rgba(255, 69, 32, 0.12);
+
+  --warning: #ffb020;
+  --danger: #ff1744;
+  --success: #84cc16;
+
+  --halo-primary: 255, 69, 32;
+  --halo-secondary: 45, 12, 8;
+
+  --sidebar-bg: #070810;
+  --sidebar-fg: #f4efe3;
+  --sidebar-accent: #ff4520;
+  --sidebar-muted: rgba(244, 239, 227, 0.5);
+  --sidebar-border: rgba(244, 239, 227, 0.06);
+
+  --shadow-panel: 0 10px 40px rgba(255, 69, 32, 0.08);
+  --shadow-hover: 0 0 0 1px var(--accent), 0 0 30px rgba(255, 69, 32, 0.28);
+
+  color-scheme: dark;
 }
 
 * {
@@ -18,17 +77,18 @@
 }
 
 html {
-  font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+  font-family: var(--font-sans, "Geist"), "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.14), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(23, 63, 95, 0.12), transparent 28%),
+    radial-gradient(circle at top left, rgba(var(--halo-primary), 0.14), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(var(--halo-secondary), 0.12), transparent 28%),
     var(--background);
   color: var(--foreground);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 a {
@@ -38,7 +98,41 @@ a {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
+.nerv-notch {
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch)) 0,
+    100% var(--notch),
+    100% 100%,
+    0 100%
+  );
+}
+
+.nerv-notch-bl {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    var(--notch) 100%,
+    0 calc(100% - var(--notch))
+  );
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes sync-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}

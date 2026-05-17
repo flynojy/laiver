@@ -94,11 +94,11 @@ export default function ImportsPage() {
         badge="Import -> Preview -> Commit"
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{status}</div> : null}
+      {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
+      {status ? <div className="rounded-2xl border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">{status}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <Card className="bg-white/88">
+        <Card className="bg-[var(--surface)]">
           <CardHeader>
             <CardTitle>Upload Source File</CardTitle>
             <CardDescription>Supports plain text, CSV, JSON, and WeFlow-style WeChat XLSX exports.</CardDescription>
@@ -146,7 +146,7 @@ export default function ImportsPage() {
                     {previewView.metadataEntries.map((entry) => (
                       <div
                         key={entry.label}
-                        className="rounded-xl border border-[color:var(--border)] bg-white px-3 py-2"
+                        className="rounded-xl border border-[color:var(--border)] bg-[var(--surface)] px-3 py-2"
                       >
                         <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
                           {entry.label}
@@ -167,7 +167,7 @@ export default function ImportsPage() {
         </Card>
 
         <div className="space-y-4">
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Normalized Message Preview</CardTitle>
               <CardDescription>Confirm speaker, role, and content before the data enters the shared import registry.</CardDescription>
@@ -176,7 +176,7 @@ export default function ImportsPage() {
               {previewView ? (
                 <div className="overflow-hidden rounded-[1.25rem] border border-[color:var(--border)]">
                   <Table>
-                    <thead className="bg-[#faf8f4]">
+                    <thead className="bg-[var(--surface-2)]">
                       <tr>
                         <TableHead>#</TableHead>
                         <TableHead>Speaker</TableHead>
@@ -204,7 +204,7 @@ export default function ImportsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/88">
+          <Card className="bg-[var(--surface)]">
             <CardHeader>
               <CardTitle>Committed Imports</CardTitle>
               <CardDescription>Saved imports stay available here for Persona extraction and later inspection.</CardDescription>
