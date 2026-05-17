@@ -38,6 +38,10 @@ MEMORY_RECALL_HINTS = (
     "prefer",
     "what do i",
     "response style",
+    "我喜欢什么",
+    "我喜欢吃什么",
+    "我偏好",
+    "记得",
 )
 TASK_HINTS = (
     "todo",

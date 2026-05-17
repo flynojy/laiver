@@ -62,6 +62,59 @@ function Test-AgentCommand {
   return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Add-AgentPortableNodeToPath {
+  $projectRoot = Get-AgentProjectRoot
+  $toolsRoot = Join-Path $projectRoot ".tmp\tools"
+  if (-not (Test-Path $toolsRoot)) {
+    return $null
+  }
+
+  $nodeTool = Get-ChildItem $toolsRoot -Directory -Filter "node-v22.*-win-x64" -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending |
+    Select-Object -First 1
+  if ($null -eq $nodeTool) {
+    return $null
+  }
+
+  $env:PATH = "$($nodeTool.FullName);$env:PATH"
+  return $nodeTool.FullName
+}
+
+function Resolve-AgentPython {
+  $projectRoot = Get-AgentProjectRoot
+  $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
+  if (Test-Path $venvPython) {
+    return $venvPython
+  }
+
+  $python = Get-Command "python" -ErrorAction SilentlyContinue
+  if ($null -eq $python) {
+    throw "Python was not found. Create a venv first: python -m venv .venv"
+  }
+  return $python.Source
+}
+
+function Resolve-AgentNpm {
+  Add-AgentPortableNodeToPath | Out-Null
+
+  $node = Get-Command "node" -ErrorAction SilentlyContinue
+  if ($null -eq $node) {
+    throw "Node.js was not found. Install Node.js 22 or place a Node 22 portable build under .tmp\tools."
+  }
+
+  $nodeVersion = (& $node.Source -p "process.versions.node").Trim()
+  $nodeMajor = [int]($nodeVersion.Split(".")[0])
+  if ($nodeMajor -ne 22) {
+    throw "Node.js $nodeVersion is active, but Laiver requires Node.js 22.x. Put Node 22 first on PATH or use the portable Node under .tmp\tools."
+  }
+
+  $npm = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
+  if ($null -eq $npm) {
+    throw "npm.cmd was not found after resolving Node.js."
+  }
+  return $npm.Source
+}
+
 function Assert-AgentCommand {
   param([Parameter(Mandatory = $true)][string]$Name)
   if (-not (Test-AgentCommand -Name $Name)) {
@@ -97,5 +150,74 @@ function Invoke-AgentInApiRoot {
   finally {
     Pop-Location
   }
+}
+
+function Test-AgentHttpOk {
+  param(
+    [Parameter(Mandatory = $true)][string]$Url
+  )
+
+  try {
+    $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
+    return [int]$response.StatusCode -ge 200 -and [int]$response.StatusCode -lt 500
+  }
+  catch {
+    return $false
+  }
+}
+
+function Wait-AgentHttpOk {
+  param(
+    [Parameter(Mandatory = $true)][string]$Url,
+    [int]$TimeoutSeconds = 40
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (Test-AgentHttpOk -Url $Url) {
+      return $true
+    }
+    Start-Sleep -Seconds 1
+  }
+  return $false
+}
+
+function Get-AgentPortListeners {
+  param([Parameter(Mandatory = $true)][int]$Port)
+
+  return @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+}
+
+function Test-AgentPortListening {
+  param([Parameter(Mandatory = $true)][int]$Port)
+
+  return @(Get-AgentPortListeners -Port $Port).Count -gt 0
+}
+
+function Get-AgentProcessCommandLine {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  try {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop
+    return [string]$process.CommandLine
+  }
+  catch {
+    return ""
+  }
+}
+
+function Test-AgentProcessLooksLocal {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  $projectRoot = Get-AgentProjectRoot
+  $commandLine = Get-AgentProcessCommandLine -ProcessId $ProcessId
+  if ([string]::IsNullOrWhiteSpace($commandLine)) {
+    return $false
+  }
+
+  return $commandLine.Contains($projectRoot) -or
+    $commandLine.Contains("uvicorn app.main:app") -or
+    $commandLine.Contains("next dev") -or
+    $commandLine.Contains("dev:web")
 }
 

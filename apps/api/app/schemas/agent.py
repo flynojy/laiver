@@ -24,6 +24,7 @@ class AgentChatRequest(BaseModel):
     user_id: uuid.UUID
     conversation_id: uuid.UUID | None = None
     persona_id: uuid.UUID | None = None
+    provider_id: uuid.UUID | None = None
     message: str
     controls: ConversationControls | None = None
 
@@ -33,6 +34,9 @@ class AgentDebugInfo(BaseModel):
     provider_name: str
     model_name: str
     model_mode: str
+    model_think_enabled: bool | None = None
+    model_think_gate: str | None = None
+    model_think_reason: str | None = None
     route_policy: str = "default"
     fallback_policy: str = "mock_on_error"
     provider_fallback_used: bool = False

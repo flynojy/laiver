@@ -28,49 +28,19 @@ import {
   seedSkills,
   type ImportDetail,
   type ImportPreview
-} from "@/lib/api";
-
-type OnboardingStep = "import" | "persona" | "training" | "runtime";
-
-type SpeakerOption = {
-  speaker: string;
-  count: number;
-  isSelf: boolean;
-};
-
-function speakerOptionsForImport(importRow: ImportDetail | null): SpeakerOption[] {
-  if (!importRow) return [];
-  const speakerStats = importRow.import_job.normalized_summary?.speaker_stats;
-  if (speakerStats && typeof speakerStats === "object" && !Array.isArray(speakerStats)) {
-    return Object.entries(speakerStats)
-      .map(([speaker, value]) => {
-        const payload = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-        return {
-          speaker,
-          count: Number(payload.message_count ?? 0),
-          isSelf: payload.is_self === true
-        };
-      })
-      .sort((left, right) => right.count - left.count);
-  }
-
-  const counts = new Map<string, SpeakerOption>();
-  for (const message of importRow.normalized_messages) {
-    const current = counts.get(message.speaker) ?? {
-      speaker: message.speaker,
-      count: 0,
-      isSelf: message.metadata?.is_self === true
-    };
-    current.count += 1;
-    counts.set(message.speaker, current);
-  }
-  return [...counts.values()].sort((left, right) => right.count - left.count);
-}
-
-function completedStep(current: OnboardingStep, target: OnboardingStep) {
-  const order: OnboardingStep[] = ["import", "persona", "training", "runtime"];
-  return order.indexOf(current) > order.indexOf(target);
-}
+} from "@/features/onboarding/client";
+import {
+  buildOnboardingStepCards,
+  defaultSpeakerForImport,
+  defaultTrainingJobName,
+  toOnboardingImportOptionViewModel,
+  toOnboardingImportPreviewViewModel,
+  toOnboardingPersonaSummaryViewModel,
+  toOnboardingRuntimeStatusViewModel,
+  toOnboardingSpeakerOptions,
+  toOnboardingTrainingJobViewModel,
+  type OnboardingStep
+} from "@/features/onboarding/mappers";
 
 function StepBadge({ done, active }: { done: boolean; active: boolean }) {
   if (done) {
@@ -90,7 +60,7 @@ export default function OnboardingPage() {
   const [selectedSpeaker, setSelectedSpeaker] = useState("");
   const [persona, setPersona] = useState<PersonaCard | null>(null);
   const [jobName, setJobName] = useState("Laiver Local Fine-Tune");
-  const [baseModel, setBaseModel] = useState("Qwen/Qwen2.5-7B-Instruct");
+  const [baseModel, setBaseModel] = useState("Qwen/Qwen3-14B");
   const [trainingJob, setTrainingJob] = useState<FineTuneJobDetail | null>(null);
   const [providerCount, setProviderCount] = useState(0);
   const [skillCount, setSkillCount] = useState(0);
@@ -98,7 +68,34 @@ export default function OnboardingPage() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
-  const speakers = useMemo(() => speakerOptionsForImport(committedImport), [committedImport]);
+  const speakers = useMemo(() => toOnboardingSpeakerOptions(committedImport), [committedImport]);
+  const importOptions = useMemo(() => imports.map(toOnboardingImportOptionViewModel), [imports]);
+  const recentImports = useMemo(() => importOptions.slice(0, 3), [importOptions]);
+  const selectedImportOption = useMemo(
+    () => (committedImport ? toOnboardingImportOptionViewModel(committedImport) : null),
+    [committedImport]
+  );
+  const previewViewModel = useMemo(
+    () => (preview ? toOnboardingImportPreviewViewModel(preview) : null),
+    [preview]
+  );
+  const personaViewModel = useMemo(() => toOnboardingPersonaSummaryViewModel(persona), [persona]);
+  const trainingJobViewModel = useMemo(() => toOnboardingTrainingJobViewModel(trainingJob), [trainingJob]);
+  const runtimeViewModel = useMemo(
+    () => toOnboardingRuntimeStatusViewModel(providerCount, skillCount),
+    [providerCount, skillCount]
+  );
+  const stepCards = useMemo(
+    () =>
+      buildOnboardingStepCards({
+        currentStep: step,
+        committedImport,
+        persona,
+        trainingJob,
+        runtime: runtimeViewModel
+      }),
+    [committedImport, persona, runtimeViewModel, step, trainingJob]
+  );
 
   useEffect(() => {
     async function bootstrap() {
@@ -124,15 +121,9 @@ export default function OnboardingPage() {
   }, []);
 
   useEffect(() => {
-    const owner = committedImport?.import_job.normalized_summary?.conversation_owner;
-    if (typeof owner === "string" && owner.trim()) {
-      setSelectedSpeaker(owner);
-    } else {
-      setSelectedSpeaker(speakers[0]?.speaker ?? "");
-    }
-    if (committedImport) {
-      setJobName(`${committedImport.import_job.file_name} Fine-Tune`);
-    }
+    setSelectedSpeaker(defaultSpeakerForImport(committedImport, speakers));
+    const nextJobName = defaultTrainingJobName(committedImport);
+    if (nextJobName) setJobName(nextJobName);
   }, [committedImport, speakers]);
 
   async function handlePreview(file: File) {
@@ -287,19 +278,14 @@ export default function OnboardingPage() {
             <CardDescription>Finish each step once, then keep refining from the dedicated pages.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { key: "import" as const, title: "Import", detail: committedImport?.import_job.file_name ?? "No import selected" },
-              { key: "persona" as const, title: "Persona", detail: persona?.name ?? "No Persona yet" },
-              { key: "training" as const, title: "Training", detail: trainingJob?.job.name ?? "No job yet" },
-              { key: "runtime" as const, title: "Runtime", detail: `${providerCount} providers / ${skillCount} seeded skills` }
-            ].map((item) => (
+            {stepCards.map((item) => (
               <button
                 key={item.key}
                 className="flex w-full items-start gap-3 rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-left"
                 onClick={() => setStep(item.key)}
               >
                 <div className="mt-1">
-                  <StepBadge done={completedStep(step, item.key)} active={step === item.key} />
+                  <StepBadge done={item.done} active={item.active} />
                 </div>
                 <div>
                   <p className="font-medium">{item.title}</p>
@@ -333,12 +319,12 @@ export default function OnboardingPage() {
                   />
                 </label>
 
-                {preview ? (
+                {previewViewModel ? (
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2">
-                      <Badge>{preview.source_type.toUpperCase()}</Badge>
-                      <Badge>{preview.total_messages} messages</Badge>
-                      <Badge>{preview.detected_participants.length} speakers</Badge>
+                      <Badge>{previewViewModel.sourceTypeLabel}</Badge>
+                      <Badge>{previewViewModel.totalMessages} messages</Badge>
+                      <Badge>{previewViewModel.participantCount} speakers</Badge>
                     </div>
                     <div className="overflow-hidden rounded-md border border-[color:var(--border)]">
                       <Table>
@@ -351,9 +337,9 @@ export default function OnboardingPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {preview.normalized_messages.slice(0, 8).map((message) => (
-                            <TableRow key={`${message.sequence_index}-${message.speaker}`}>
-                              <TableCell>{message.sequence_index}</TableCell>
+                          {previewViewModel.rows.map((message) => (
+                            <TableRow key={`${message.sequenceIndex}-${message.speaker}`}>
+                              <TableCell>{message.sequenceIndex}</TableCell>
                               <TableCell>{message.speaker}</TableCell>
                               <TableCell>{message.role}</TableCell>
                               <TableCell>{message.content}</TableCell>
@@ -367,16 +353,16 @@ export default function OnboardingPage() {
                   <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
                     <p className="font-medium">Recent imports</p>
                     <div className="mt-3 space-y-2">
-                      {imports.slice(0, 3).map((item) => (
+                      {recentImports.map((item) => (
                         <button
-                          key={item.import_job.id}
-                          className="w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 py-2 text-left"
+                          key={item.id}
+                          className="w-full rounded-md border border-[color:var(--border)] bg-white px-3 py-2 text-left"
                           onClick={() => {
-                            setCommittedImport(item);
+                            setCommittedImport(imports.find((row) => row.import_job.id === item.id) ?? null);
                             setStep("persona");
                           }}
                         >
-                          {item.import_job.file_name}
+                          {item.fileName}
                         </button>
                       ))}
                     </div>
@@ -405,16 +391,16 @@ export default function OnboardingPage() {
                     <div className="space-y-2">
                       <Label>Import</Label>
                       <select
-                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
-                        value={committedImport.import_job.id}
+                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                        value={selectedImportOption?.id ?? ""}
                         onChange={(event) => {
                           const next = imports.find((item) => item.import_job.id === event.target.value) ?? null;
                           setCommittedImport(next);
                         }}
                       >
-                        {imports.map((item) => (
-                          <option key={item.import_job.id} value={item.import_job.id}>
-                            {item.import_job.file_name}
+                        {importOptions.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.fileName}
                           </option>
                         ))}
                       </select>
@@ -428,20 +414,20 @@ export default function OnboardingPage() {
                       >
                         {speakers.map((item) => (
                           <option key={item.speaker} value={item.speaker}>
-                            {item.speaker} ({item.count}){item.isSelf ? " self" : ""}
+                            {item.label}
                           </option>
                         ))}
                       </select>
                     </div>
-                    {persona ? (
-                      <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
+                    {personaViewModel ? (
+                      <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
                         <div className="flex flex-wrap gap-2">
-                          <Badge>{persona.tone}</Badge>
-                          <Badge>{persona.verbosity}</Badge>
-                          {persona.is_default ? <Badge>default</Badge> : null}
+                          {personaViewModel.badges.map((item) => (
+                            <Badge key={item}>{item}</Badge>
+                          ))}
                         </div>
-                        <p className="mt-3 font-medium">{persona.name}</p>
-                        <p className="mt-2 text-[var(--muted-foreground)]">{persona.description || "Persona ready."}</p>
+                        <p className="mt-3 font-medium">{personaViewModel.name}</p>
+                        <p className="mt-2 text-[var(--muted-foreground)]">{personaViewModel.description}</p>
                       </div>
                     ) : personas.length > 0 ? (
                       <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
@@ -463,7 +449,7 @@ export default function OnboardingPage() {
             <Card className="bg-[var(--surface)]">
               <CardHeader>
                 <CardTitle>Prepare Fine-Tuning</CardTitle>
-                <CardDescription>Create a local QLoRA dataset from the committed chat archive.</CardDescription>
+                <CardDescription>Create a Qwen3-14B QLoRA dataset from the committed chat archive.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -473,18 +459,21 @@ export default function OnboardingPage() {
                 <div className="space-y-2">
                   <Label>Base Model</Label>
                   <Input value={baseModel} onChange={(event) => setBaseModel(event.target.value)} />
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Recommended for 16GB VRAM: Qwen/Qwen3-14B with QLoRA in WSL2 or Linux.
+                  </p>
                 </div>
-                {trainingJob ? (
-                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
+                {trainingJobViewModel ? (
+                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
                     <div className="flex flex-wrap gap-2">
-                      <Badge>{trainingJob.job.status}</Badge>
-                      <Badge>{trainingJob.job.backend}</Badge>
-                      <Badge>{trainingJob.job.source_speaker}</Badge>
+                      <Badge>{trainingJobViewModel.status}</Badge>
+                      <Badge>{trainingJobViewModel.backend}</Badge>
+                      <Badge>{trainingJobViewModel.sourceSpeaker}</Badge>
                     </div>
-                    <p className="mt-3 font-medium">{trainingJob.job.name}</p>
+                    <p className="mt-3 font-medium">{trainingJobViewModel.name}</p>
                     <p className="mt-2 text-[var(--muted-foreground)]">
-                      train {trainingJob.job.train_examples} / validation {trainingJob.job.validation_examples} / test{" "}
-                      {trainingJob.job.test_examples}
+                      train {trainingJobViewModel.trainExamples} / validation {trainingJobViewModel.validationExamples} / test{" "}
+                      {trainingJobViewModel.testExamples}
                     </p>
                   </div>
                 ) : null}
@@ -512,11 +501,11 @@ export default function OnboardingPage() {
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4">
                     <p className="text-sm font-medium">Model Providers</p>
-                    <p className="mt-2 text-2xl font-semibold">{providerCount}</p>
+                    <p className="mt-2 text-2xl font-semibold">{runtimeViewModel.providerCount}</p>
                   </div>
                   <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4">
                     <p className="text-sm font-medium">Seeded Skills</p>
-                    <p className="mt-2 text-2xl font-semibold">{skillCount}</p>
+                    <p className="mt-2 text-2xl font-semibold">{runtimeViewModel.skillCount}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">

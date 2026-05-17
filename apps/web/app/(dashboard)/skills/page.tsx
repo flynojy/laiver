@@ -16,9 +16,11 @@ import {
   listSkillInvocations,
   listSkills,
   seedSkills
-} from "@/lib/api";
+} from "@/features/skills/client";
 
-function InvocationList({ invocations }: { invocations: SkillInvocationRecord[] }) {
+import { toSkillCardViewModel, toSkillInvocationViewModel } from "@/features/skills/mappers";
+
+function InvocationList({ invocations }: { invocations: ReturnType<typeof toSkillInvocationViewModel>[] }) {
   if (invocations.length === 0) {
     return <p className="text-sm text-[var(--muted-foreground)]">No invocation records yet.</p>;
   }
@@ -26,29 +28,22 @@ function InvocationList({ invocations }: { invocations: SkillInvocationRecord[] 
   return (
     <div className="space-y-3">
       {invocations.map((item) => (
-        <div key={item.invocation_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
+        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
           <div className="flex flex-wrap gap-2">
-            <Badge>{item.skill_slug}</Badge>
-            <Badge>{item.tool_name}</Badge>
-            <Badge>{item.trigger_source}</Badge>
-            <Badge>{item.status}</Badge>
+            {item.badges.map((badge) => (
+              <Badge key={badge}>{badge}</Badge>
+            ))}
           </div>
-          <p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.trace_id}</p>
-          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-            started: {item.started_at ?? "n/a"} | finished: {item.finished_at ?? "n/a"}
-          </p>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
-            {JSON.stringify(item.output, null, 2)}
+          <p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.traceId}</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.timingLabel}</p>
+          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+            {item.outputJson}
           </pre>
           {item.error ? <p className="mt-2 text-xs text-[var(--danger)]">{item.error}</p> : null}
         </div>
       ))}
     </div>
   );
-}
-
-function skillTypeLabel(skill: SkillRecord) {
-  return skill.is_builtin ? "builtin" : "community";
 }
 
 export default function SkillsPage() {
@@ -82,11 +77,11 @@ export default function SkillsPage() {
     () => skills.find((skill) => skill.id === activeSkillId) ?? skills[0] ?? null,
     [activeSkillId, skills]
   );
-  const executableHandler = typeof activeSkill?.runtime_config?.handler_slug === "string"
-    ? String(activeSkill.runtime_config.handler_slug)
-    : activeSkill?.is_builtin
-      ? activeSkill?.slug
-      : "";
+  const activeSkillViewModel = useMemo(
+    () => (activeSkill ? toSkillCardViewModel(activeSkill) : null),
+    [activeSkill]
+  );
+  const invocationViewModels = useMemo(() => invocations.slice(0, 8).map(toSkillInvocationViewModel), [invocations]);
 
   async function handleToggle(skill: SkillRecord) {
     setLoading(true);
@@ -186,26 +181,27 @@ export default function SkillsPage() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-3">
-              {skills.map((skill) => (
-                <button
-                  key={skill.id}
-                  className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] px-4 py-4 text-left"
-                  onClick={() => setActiveSkillId(skill.id)}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{skill.title}</p>
-                    <Badge>{skill.status}</Badge>
-                    <Badge>{skillTypeLabel(skill)}</Badge>
-                    {!skill.is_builtin && skill.runtime_config?.handler_slug ? (
-                      <Badge>proxy:{String(skill.runtime_config.handler_slug)}</Badge>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-sm text-[var(--muted-foreground)]">{skill.description}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-                    {skill.slug} | v{skill.version}
-                  </p>
-                </button>
-              ))}
+              {skills.map((skill) => {
+                const vm = toSkillCardViewModel(skill);
+                return (
+                  <button
+                    key={skill.id}
+                    className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
+                    onClick={() => setActiveSkillId(skill.id)}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{vm.title}</p>
+                      <Badge>{vm.status}</Badge>
+                      <Badge>{vm.typeLabel}</Badge>
+                      {vm.proxyLabel ? <Badge>{vm.proxyLabel}</Badge> : null}
+                    </div>
+                    <p className="mt-2 text-sm text-[var(--muted-foreground)]">{vm.description}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                      {vm.slug} | {vm.versionLabel}
+                    </p>
+                  </button>
+                );
+              })}
             </CardContent>
           </Card>
 
@@ -242,20 +238,20 @@ export default function SkillsPage() {
               <CardDescription>Inspect the installed manifest, runtime config, and execution mode for the selected skill.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeSkill ? (
+              {activeSkill && activeSkillViewModel ? (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{activeSkill.slug}</Badge>
-                    <Badge>{activeSkill.status}</Badge>
-                    <Badge>{skillTypeLabel(activeSkill)}</Badge>
-                    <Badge>v{activeSkill.version}</Badge>
-                    {executableHandler ? <Badge>handler:{executableHandler}</Badge> : <Badge>manifest-only</Badge>}
+                    <Badge>{activeSkillViewModel.slug}</Badge>
+                    <Badge>{activeSkillViewModel.status}</Badge>
+                    <Badge>{activeSkillViewModel.typeLabel}</Badge>
+                    <Badge>{activeSkillViewModel.versionLabel}</Badge>
+                    <Badge>{activeSkillViewModel.handlerLabel}</Badge>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <Button disabled={loading} onClick={() => handleToggle(activeSkill)}>
-                      {activeSkill.status === "active" ? "Disable Skill" : "Enable Skill"}
+                      {activeSkillViewModel.toggleLabel}
                     </Button>
-                    {!activeSkill.is_builtin ? (
+                    {activeSkillViewModel.isCommunity ? (
                       <Button variant="secondary" disabled={loading} onClick={() => handleRemove(activeSkill)}>
                         Remove Community Skill
                       </Button>
@@ -264,14 +260,14 @@ export default function SkillsPage() {
                   <div className="grid gap-4 xl:grid-cols-2">
                     <div>
                       <p className="mb-2 text-sm font-medium">Manifest</p>
-                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[var(--surface-2)] p-4 text-xs leading-6">
-                        {JSON.stringify(activeSkill.manifest, null, 2)}
+                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[#faf8f4] p-4 text-xs leading-6">
+                        {activeSkillViewModel.manifestJson}
                       </pre>
                     </div>
                     <div>
                       <p className="mb-2 text-sm font-medium">Runtime Config</p>
-                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[var(--surface-2)] p-4 text-xs leading-6">
-                        {JSON.stringify(activeSkill.runtime_config, null, 2)}
+                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[#faf8f4] p-4 text-xs leading-6">
+                        {activeSkillViewModel.runtimeConfigJson}
                       </pre>
                     </div>
                   </div>
@@ -288,7 +284,7 @@ export default function SkillsPage() {
               <CardDescription>Actual runtime calls logged by the backend skill registry.</CardDescription>
             </CardHeader>
             <CardContent>
-              <InvocationList invocations={invocations.slice(0, 8)} />
+              <InvocationList invocations={invocationViewModels} />
             </CardContent>
           </Card>
         </div>

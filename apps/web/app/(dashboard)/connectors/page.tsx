@@ -23,22 +23,35 @@ import {
   listConnectors,
   testConnector,
   updateConnector
-} from "@/lib/api";
+} from "@/features/connectors/client";
+import {
+  connectorDeliveryMode,
+  connectorMode,
+  toConnectorCardViewModel,
+  toConnectorDeliveryViewModel,
+  toConnectorDetailViewModel,
+  toConnectorMappingViewModel,
+  toJson
+} from "@/features/connectors/mappers";
+import type {
+  ConnectorDeliveryViewModel,
+  ConnectorMappingViewModel
+} from "@/features/connectors/view-models";
 
-function JsonPanel({ title, value }: { title: string; value: unknown }) {
+function JsonPanel({ title, json }: { title: string; json: string }) {
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
         {title}
       </p>
-      <pre className="mt-2 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
-        {JSON.stringify(value, null, 2)}
+      <pre className="mt-2 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+        {json}
       </pre>
     </div>
   );
 }
 
-function MappingList({ mappings }: { mappings: ConnectorConversationMappingRecord[] }) {
+function MappingList({ mappings }: { mappings: ConnectorMappingViewModel[] }) {
   if (mappings.length === 0) {
     return <p className="text-sm text-[var(--muted-foreground)]">No conversation mappings yet.</p>;
   }
@@ -46,25 +59,22 @@ function MappingList({ mappings }: { mappings: ConnectorConversationMappingRecor
   return (
     <div className="space-y-3">
       {mappings.map((item) => (
-        <div key={item.mapping_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
+        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
           <div className="flex flex-wrap gap-2">
-            <Badge>{item.memory_scope}</Badge>
-            {item.default_persona_id ? <Badge>persona-linked</Badge> : <Badge>persona-open</Badge>}
+            {item.badges.map((badge) => (
+              <Badge key={badge}>{badge}</Badge>
+            ))}
           </div>
-          <p className="mt-2 text-sm font-medium">{item.conversation_key}</p>
-          <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-            external chat: {item.external_chat_id ?? "n/a"} | external user: {item.external_user_id ?? "n/a"}
-          </p>
-          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-            internal conversation: {item.internal_conversation_id ?? "pending"}
-          </p>
+          <p className="mt-2 text-sm font-medium">{item.conversationKey}</p>
+          <p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.externalLabel}</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.internalConversationLabel}</p>
         </div>
       ))}
     </div>
   );
 }
 
-function DeliveryList({ deliveries }: { deliveries: ConnectorDeliveryRecord[] }) {
+function DeliveryList({ deliveries }: { deliveries: ConnectorDeliveryViewModel[] }) {
   if (deliveries.length === 0) {
     return <p className="text-sm text-[var(--muted-foreground)]">No delivery records yet.</p>;
   }
@@ -72,22 +82,18 @@ function DeliveryList({ deliveries }: { deliveries: ConnectorDeliveryRecord[] })
   return (
     <div className="space-y-3">
       {deliveries.map((item) => (
-        <div key={item.delivery_id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
+        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
           <div className="flex flex-wrap gap-2">
-            <Badge>{item.connector_type}</Badge>
-            <Badge>{item.delivery_status}</Badge>
-            <Badge>{item.mode}</Badge>
-            {item.trace?.skills_used?.length ? <Badge>{item.trace.skills_used.join(", ")}</Badge> : null}
+            {item.badges.map((badge) => (
+              <Badge key={badge}>{badge}</Badge>
+            ))}
           </div>
-          <p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.trace?.connector_trace_id ?? item.trace_id}</p>
-          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-            mapped conversation: {item.trace?.mapped_conversation_id ?? item.internal_conversation_id ?? "pending"}
-          </p>
+          <p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.traceLabel}</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.mappedConversationLabel}</p>
           <div className="mt-3 grid gap-3 xl:grid-cols-2">
-            <JsonPanel title="Trace" value={item.trace ?? {}} />
-            <JsonPanel title="Mapping" value={item.mapping ?? {}} />
-            <JsonPanel title="Normalized Input" value={item.normalized_input} />
-            <JsonPanel title="Outbound Payload" value={item.outbound_response} />
+            {item.panels.map((panel) => (
+              <JsonPanel key={panel.title} title={panel.title} json={panel.json} />
+            ))}
           </div>
           {item.error ? <p className="mt-2 text-xs text-[var(--danger)]">{item.error}</p> : null}
         </div>
@@ -176,9 +182,20 @@ export default function ConnectorsPage() {
     [deliveries]
   );
   const latestTrace = deliveries[0]?.trace ?? null;
+  const connectorCards = useMemo(() => connectors.map(toConnectorCardViewModel), [connectors]);
+  const activeConnectorViewModel = useMemo(
+    () => (activeConnector ? toConnectorDetailViewModel(activeConnector, configDraft) : null),
+    [activeConnector, configDraft]
+  );
+  const mappingViewModels = useMemo(() => mappings.map(toConnectorMappingViewModel), [mappings]);
+  const deliveryViewModels = useMemo(() => deliveries.map(toConnectorDeliveryViewModel), [deliveries]);
+  const failedDeliveryViewModels = useMemo(
+    () => failedDeliveries.map(toConnectorDeliveryViewModel),
+    [failedDeliveries]
+  );
 
-  const mode = String(configDraft.mode ?? activeConnector?.config.mode ?? "mock");
-  const deliveryMode = String(configDraft.delivery_mode ?? activeConnector?.config.delivery_mode ?? "webhook");
+  const mode = activeConnectorViewModel?.mode ?? connectorMode(activeConnector, configDraft);
+  const deliveryMode = activeConnectorViewModel?.deliveryMode ?? connectorDeliveryMode(activeConnector, configDraft);
 
   function setConfigValue(key: string, value: string | boolean) {
     setConfigDraft((current) => ({
@@ -207,10 +224,8 @@ export default function ConnectorsPage() {
               Start with mock mode locally. When you are ready for live Feishu replies, switch the delivery mode to webhook or OpenAPI and save the connector config below.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <pre className="overflow-x-auto rounded-[1.25rem] bg-[var(--surface-2)] p-4 text-xs leading-6">
-              {JSON.stringify(skeleton ?? {}, null, 2)}
-            </pre>
+            <CardContent className="space-y-4">
+            <pre className="overflow-x-auto rounded-[1.25rem] bg-[#faf8f4] p-4 text-xs leading-6">{toJson(skeleton ?? {})}</pre>
             <Button
               className="w-full"
               disabled={!userId || loading}
@@ -251,23 +266,22 @@ export default function ConnectorsPage() {
             </Button>
 
             <div className="space-y-3">
-              {connectors.map((connector) => (
+              {connectorCards.map((connector) => (
                 <button
-                  key={connector.connector_id}
-                  className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] px-4 py-4 text-left"
+                  key={connector.id}
+                  className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
                   onClick={async () => {
-                    setActiveConnectorId(connector.connector_id);
-                    await refresh(connector.connector_id);
+                    setActiveConnectorId(connector.id);
+                    await refresh(connector.id);
                   }}
                 >
                   <div className="flex flex-wrap gap-2">
                     <p className="font-medium">{connector.name}</p>
-                    <Badge>{connector.connector_type}</Badge>
-                    <Badge>{connector.status}</Badge>
-                    <Badge>{String(connector.config.mode ?? "mock")}</Badge>
-                    <Badge>{String(connector.config.delivery_mode ?? "webhook")}</Badge>
+                    {connector.badges.map((badge) => (
+                      <Badge key={badge}>{badge}</Badge>
+                    ))}
                   </div>
-                  <p className="mt-2 text-xs text-[var(--muted-foreground)]">{connector.connector_id}</p>
+                  <p className="mt-2 text-xs text-[var(--muted-foreground)]">{connector.id}</p>
                 </button>
               ))}
             </div>
@@ -283,16 +297,15 @@ export default function ConnectorsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeConnector ? (
+              {activeConnector && activeConnectorViewModel ? (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{activeConnector.connector_type}</Badge>
-                    <Badge>{activeConnector.status}</Badge>
-                    <Badge>{mode}</Badge>
-                    <Badge>{deliveryMode}</Badge>
+                    {activeConnectorViewModel.badges.map((badge) => (
+                      <Badge key={badge}>{badge}</Badge>
+                    ))}
                   </div>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Webhook path: <code>/api/v1/connectors/feishu/webhook/{activeConnector.connector_id}</code>
+                    Webhook path: <code>{activeConnectorViewModel.webhookPath}</code>
                   </p>
 
                   <div className="grid gap-4 md:grid-cols-2">
@@ -437,7 +450,7 @@ export default function ConnectorsPage() {
                 <CardDescription>Same Feishu chat should keep reusing the same internal conversation once a mapping exists.</CardDescription>
               </CardHeader>
               <CardContent>
-                <MappingList mappings={mappings} />
+                <MappingList mappings={mappingViewModels} />
               </CardContent>
             </Card>
 
@@ -448,7 +461,7 @@ export default function ConnectorsPage() {
               </CardHeader>
               <CardContent>
                 {latestTrace ? (
-                  <JsonPanel title="Latest Trace" value={latestTrace} />
+                  <JsonPanel title="Latest Trace" json={toJson(latestTrace)} />
                 ) : (
                   <p className="text-sm text-[var(--muted-foreground)]">No trace recorded yet.</p>
                 )}
@@ -463,7 +476,7 @@ export default function ConnectorsPage() {
                 <CardDescription>Inbound summary, normalized input, mapped conversation, and outbound payload are all stored here.</CardDescription>
               </CardHeader>
               <CardContent>
-                <DeliveryList deliveries={deliveries} />
+                <DeliveryList deliveries={deliveryViewModels} />
               </CardContent>
             </Card>
 
@@ -473,7 +486,7 @@ export default function ConnectorsPage() {
                 <CardDescription>Failures stay visible here, but mapping and internal agent execution should still remain intact.</CardDescription>
               </CardHeader>
               <CardContent>
-                <DeliveryList deliveries={failedDeliveries} />
+                <DeliveryList deliveries={failedDeliveryViewModels} />
               </CardContent>
             </Card>
           </div>

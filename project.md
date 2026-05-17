@@ -1,6 +1,6 @@
 # Laiver 项目基线
 
-最后更新日期：2026-05-08
+最后更新日期：2026-05-11
 
 本文档是后续修改、排期和 Agent 协作的项目基底。它基于当前仓库代码、README、`agent.md`、架构文档、ADR、Memory 计划文档、测试入口和一次本地验证尝试整理。除非有新的代码或测试结果覆盖，后续应以本文档作为当前状态判断。
 
@@ -238,16 +238,26 @@ Training 链路当前支持：
 - `npm run eval:memory`
   - 结果：通过，7 个 regression eval OK，已覆盖 profile、episodic、exact phrase、chat grounding、duplicate、conflict 和 gated approval。
 
-因此当前状态是：**API 与 Web 的基础验证入口已恢复绿色；本机全局 Node 仍是 v25.9.0，执行前端命令时需要先切换到 Node 22**。
+2026-05-11 本机链路补充：
+
+- 已新增 `npm.cmd run windows:local`，作为 Windows 本机 SQLite 模式的一行启动入口。
+- 已新增 `npm.cmd run windows:local:stop`，用于停止本机链路占用的 API/Web 端口。
+- `npm.cmd run windows:doctor` 已调整为本机链路优先检查，Docker 不再是默认必需项。
+- 当前优先路线调整为：**先稳定本机链路，再做 Docker 容器部署优化**。
+- 本机链路依赖 `.venv`、项目内 Node 22 或 PATH 中 Node 22、SQLite `apps/api/local.db`。
+- Docker 链路暂不作为近期主线；后续在本机流程稳定后再统一修 Docker Desktop、compose、容器化 API/Web 和持久化卷。
+
+因此当前状态是：**API 与 Web 的基础验证入口已恢复绿色；本机运行链路已经有一行启动脚本；完整 Docker 链路仍需后置优化**。
 
 下一次改动前建议先恢复验证基线：
 
 1. 准备后端 Python 3.11+ 虚拟环境，激活后执行 `python -m pip install -e "apps/api[dev]"`。
-2. 切换到 Node 22，并执行 `npm ci` 安装 web workspace 依赖。
-3. 跑通 `npm run lint:api` 和 `npm run test:api`。
-4. 跑通 `npm run eval:memory`。
-5. 跑通 `npm run typecheck:web` 和 `npm run build:web`。
-6. 再执行 `python scripts/run_mvp_regression.py`。
+2. 确认 Node 22 可用，并执行 `npm.cmd ci` 安装 web workspace 依赖。
+3. 先跑通 `npm.cmd run windows:local -- -NoBrowser`，确认本机 API/Web 可启动。
+4. 跑通 `npm.cmd run lint:api` 和 `npm.cmd run test:api`。
+5. 跑通 `npm.cmd run eval:memory`。
+6. 跑通 `npm.cmd run typecheck:web` 和 `npm.cmd run build:web`。
+7. 再执行 `python scripts/run_mvp_regression.py`。
 
 ## 5. 已知问题与任务池
 
@@ -255,8 +265,18 @@ Training 链路当前支持：
 
 - 后端 lint 和 integration suite 已可在 `.venv` 中通过。
 - 前端 TypeScript `baseUrl` 弃用检查已通过移除 `baseUrl` 处理；Node 22 下 `npm ci`、`npm run typecheck:web`、`npm run build:web` 已通过。
-- 需要在 Windows/PowerShell 环境确认 `python` 命令是否指向项目 venv；当前 macOS shell 中只有 `python3`。
-- 本机全局 Node 是 v25.9.0，不符合项目 `engines`；需要使用 `.nvmrc` 或 `/opt/homebrew/opt/node@22/bin` 切换。
+- Windows 本机链路优先使用 `.venv\Scripts\python.exe`，避免依赖全局 Python。
+- 本机全局 Node 可能不是 22；`scripts/windows/Start-AgentLocal.ps1` 会优先解析 `.tmp\tools` 下的 Node 22 便携版。
+- 需要补充一条本机启动脚本的自动化验证，至少覆盖脚本语法、缺依赖提示、端口占用提示、API/Web health check。
+
+### P0：本机启动链路产品化
+
+- 当前已有 `npm.cmd run windows:local`，可以一行启动 SQLite + API + Web。
+- 当前已有 `npm.cmd run windows:local:stop`，用于清理 3000/8000 上看起来属于本项目的进程；不确定归属时会提示，避免误杀其他服务。
+- 当前 `npm.cmd run windows:doctor` 已覆盖 `.venv`、Node 22、依赖安装、端口占用、`.env`、SQLite 文件可写性。
+- 已补基础错误提示：端口被占用、Node 版本不对、Python 依赖缺失、API 启动失败、Web 启动失败。
+- 仍需补脚本级自动化测试，覆盖 doctor / start / stop 的常见分支。
+- 后续可把 PowerShell 启动链路包装为 exe，但应在脚本稳定后再做。
 
 ### P1：Memory 质量、治理与可解释性
 
@@ -279,7 +299,7 @@ Training 链路当前支持：
 - 当前已有 dataset/job/artifact/provider 注册链路，但真实 GPU 训练稳定性未验证。
 - 显存占用、训练耗时、失败恢复、artifact 兼容性仍需实测。
 - 训练效果缺 A/B 对比和质量评估流程。
-- 本地 QLoRA 默认模型与目标硬件的适配策略需要明确。
+- 本地 QLoRA 默认模型已选定为 `Qwen/Qwen3-14B`；目标硬件为 16GB 显存机器，真实训练仍需 WSL2/Linux、CUDA、依赖、显存占用和效果验证。
 
 ### P2：Import 工程化
 
@@ -308,18 +328,20 @@ Training 链路当前支持：
 
 ## 6. 推荐近期路线
 
-建议后续按下面顺序推进，避免在验证不稳定时继续扩大改动面：
+建议后续按下面顺序推进，先把本机用户路径做扎实，再扩展 Docker 和更重的生产化能力：
 
-1. 修复本地验证基线：Python 依赖、前端 typecheck、web build、integration suite。
-2. 把 README / `agent.md` / 本文件中的验证命令更新为当前可执行口径。
-3. Memory regression harness 已纳入 `npm run check`，后续改 retrieval 和治理前必须先跑。
-4. 继续扩展 exact / full-text 覆盖面，并补更完整的 memory trace。
-5. 强化 provider health check、fallback policy、route policy。
-6. 在真实 GPU 环境验证 local training，补训练效果 A/B 对比。
-7. 补 Import 的大文件异步、进度、断点和更多微信格式。
-8. 在 Feishu 稳定后再扩展新 Connector。
-9. 推进 Skill marketplace / 签名 / 权限 / 沙箱。
-10. 做 dashboard 级 UI polish，优先改真实使用路径。
+1. 跑一次完整本机验收：`windows:doctor` -> `windows:local` -> Onboarding -> Import -> Persona -> Chat -> Memory -> Settings -> `windows:local:stop`。
+2. 补本机脚本自动化测试，覆盖 doctor / start / stop 的语法、缺依赖、端口占用和 health check 分支。
+3. 把 `agent.md` 中的命令同步到 Windows 本机优先口径。
+4. 强化模型设置体验：切换前自动 validate、失败回滚提示、provider health cache、独立模型管理入口。
+5. 继续细化 fallback policy：`none` 策略错误语义、备用 provider 链路、多 provider health cache、真实 DeepSeek/Ollama/Local Adapter live check。
+6. 强化 Memory 可解释性：更清晰 memory trace、中文姓名/专有名词/长原话片段 regression、rollback/merge/privacy tier。
+7. 做 Onboarding / Chat / Memory / Settings 的产品体验 polish，优先改善真实使用路径，不做营销页。
+8. 验证 local fine-tuning：真实 GPU、显存、耗时、失败恢复、artifact 兼容性和 A/B 效果评估。
+9. Import 工程化：更多微信导出格式、大文件异步、进度反馈、错误恢复、断点续传、附件/撤回/引用/表情。
+10. Docker 后置优化：修 Docker Desktop 环境、compose 全链路、PostgreSQL/Redis/Qdrant 持久化、容器健康检查、容器化 API/Web。
+11. Skill 平台化：marketplace、版本更新、签名校验、权限审核和沙箱执行。
+12. Connector 扩展：先稳定 Feishu live，再考虑微信、Telegram、Email。
 
 ## 7. 协作约定
 
@@ -345,10 +367,18 @@ Training 链路当前支持：
 Windows-first 路径：
 
 ```powershell
-nvm use 22
 npm.cmd ci
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -e "apps/api[dev]"
 npm.cmd run windows:doctor
+npm.cmd run windows:local
+npm.cmd run windows:local:stop
+```
+
+Docker 完整链路后置：
+
+```powershell
 npm.cmd run windows:infra:up
 npm.cmd run windows:db:migrate
 npm.cmd run windows:dev:api
@@ -360,7 +390,6 @@ npm.cmd run windows:infra:down
 前端验证：
 
 ```powershell
-nvm use 22
 npm.cmd ci
 npm.cmd run typecheck:web
 npm.cmd run build:web
@@ -376,7 +405,7 @@ npm.cmd run eval:memory
 python scripts/run_mvp_regression.py
 ```
 
-注意：当前 macOS shell 中 `python` 不存在，`python3` 存在但未安装后端依赖。后续应在项目虚拟环境中统一命令口径。
+注意：当前项目优先走 Windows 本机链路。前端命令必须使用 Node 22；后端命令优先使用项目 `.venv`。
 
 ## 9. 关键参考文件
 
@@ -459,3 +488,79 @@ python scripts/run_mvp_regression.py
 - 未来 P2：Skill 平台化，补 marketplace、版本更新、签名校验、权限审核和沙箱执行。
 - 未来 P2：Connector 扩展，在 Feishu 稳定后补微信、Telegram、Email，并增强 live 部署、重试和可观测性。
 - 未来 P2：Dashboard 产品体验 polish，重点改善 Onboarding、Memory、Training、Connector 页面，不改成营销页。
+
+### 2026-05-11：整理用户态 README 部署与使用教程
+
+- 本轮完成：重写 `README.md` 为面向用户的部署到实际使用教程，按轻量 SQLite 本地模式、Docker 完整模式、模型配置、首次使用、页面说明、验收流程和常见问题组织。
+- 本轮完成：新增 `scripts/windows/Start-AgentLocal.ps1` 和 `npm.cmd run windows:local`，作为本机 SQLite 链路的一行启动入口；脚本会解析 `.venv`、Node 22、`.env`，启动 API/Web 并做健康检查。
+- 本轮完成：补充 `scripts/windows/Stop-AgentLocal.ps1`、`npm.cmd run windows:local:stop`，并把 `windows:doctor` 调整为本机链路优先的环境诊断。
+- 本轮完成：新增 `docs/fixtures/simulated-yokohama-yandere-chat.csv`，作为虚构聊天记录导入样例；已用 import parser 验证为 124 条 CSV 消息，参与者为 `我` 和 `神崎澪`。
+- 本轮说明：未修改应用源码；文档基于当前 Windows 脚本、`.env.example`、`docker-compose.yml`、Web 页面和 API 路由整理。
+- 下一步建议：如果要继续产品化文档，可补充真实示例聊天记录、截图、Feishu live webhook 配置步骤，以及 Docker Desktop 故障排查页。
+
+### 2026-05-12：中文化本机 mock fallback 回复
+
+- 本轮完成：修正 Agent mock fallback 默认回复，避免把 `Mock mode is active`、`Current persona focus` 等调试英文模板暴露给用户；调试状态继续保留在 debug 字段。
+- 本轮完成：memory grounding、task grounding、skill error fallback 的用户可见提示改为中文。
+- 本轮测试：相关集成测试通过，包括默认 mock 中文回复、provider 不可达 fallback、memory grounding、task extractor grounding 和 skill failure fallback。
+- 本轮实测：本机服务重启后，发送 `你好` 返回 `早安。看到你发来消息，我就安心一点。...`，debug 显示仍为 `mock_provider_default` / `api_key_missing`。
+
+### 2026-05-12：增强本机 mock 对话的基础回应能力
+
+- 本轮完成：为 Agent mock fallback 增加轻量中文对话策略，能自然处理打招呼、`我喜欢吃 X` 和 `我喜欢吃什么` 这类本机验收常见对话。
+- 本轮完成：为 memory-search 触发词补充中文 recall hint，例如 `我喜欢什么`、`我喜欢吃什么`、`记得`。
+- 本轮测试：新增并通过 `test_mock_conversation_answers_simple_preference_followup`，覆盖 `你好 -> 我喜欢吃冰淇淋 -> 我喜欢吃什么呀`。
+- 本轮实测：本机服务重启后，追问 `我喜欢吃什么呀` 返回 `你喜欢冰淇淋。我记住了。`。
+### 2026-05-12: Qwen think gate strategy
+
+- Default to `think=false` for fast replies, greetings, short confirmations, and fixed-format answers.
+- Add a lightweight preflight gate before provider execution to classify each request as `fast_reply`, `need_reasoning`, or `tool_or_memory_heavy`.
+- Enable `think=true` only when the request is ambiguous, multi-step, tool-heavy, memory-conflict-heavy, or explicitly asks for reasoning.
+- Record the gate decision in debug output so later traces can explain why thinking was enabled or skipped.
+- First target: Ollama `qwen3:14b`, using the native `/api/chat` `think` field.
+
+### 2026-05-12: Qwen think gate implementation
+
+- 本轮完成：Ollama provider 默认在 `/api/chat` 顶层发送 `think=false`，避免 Qwen3 简短对话先进入长思考导致回复空白或延迟。
+- 本轮完成：新增轻量 preflight gate，按 `fast_reply`、`need_reasoning`、`tool_or_memory_heavy` 分类；provider settings 中的 `think`、`ollama_think`、`enable_thinking`、`think_mode` 会优先生效。
+- 本轮完成：Agent debug 和 Chat 页面展示 `think on/off` 与 gate 名称，方便后续观察什么时候启动思考模式。
+- 本轮完成：`windows:ollama:check` 生成测试默认带 `think=false`，更适合 Qwen3 本机链路快速验收。
+- 本轮验证：新增并通过 Ollama think gate 相关后端测试，Web typecheck 通过。
+
+### 2026-05-12: frontend decoupling first slice
+
+- 本轮目标：为后续 UI 重铸降低前后端耦合，先不改后端 API，不改变页面行为。
+- 本轮完成：新增 `apps/web/features/chat/view-models.ts` 和 `apps/web/features/chat/mappers.ts`，把 `AgentChatResponse`、`MemoryRecord.metadata`、skill invocation 等后端 DTO 映射为 Chat 专用 ViewModel。
+- 本轮完成：`/chat` 页面改为渲染 Chat ViewModel，不再直接读取 `lastRun.debug.*` 或 memory metadata；后端 DTO 只集中出现在 feature mapper 中。
+- 本轮完成：把 conversation controls 的默认值与归一化逻辑移入 Chat feature 层，页面只消费产品态 controls。
+- 本轮验证：`npm.cmd run typecheck:web` 与 `npm.cmd run build:web` 均通过。
+- 下一步建议：按同样模式继续改 Settings/provider 和 Memories 页面，把 provider settings、local adapter runtime、memory debug metadata 收敛到各自 feature mapper。
+
+### 2026-05-12: provider settings decoupling slice
+
+- 本轮目标：继续降低 UI 重铸风险，把 Settings/provider 页面从后端 provider schema、validation schema 和 local adapter runtime schema 中解耦出来。
+- 本轮完成：新增 `apps/web/features/providers/view-models.ts` 和 `apps/web/features/providers/mappers.ts`，集中定义 ProviderCard、Validation、LocalAdapterRuntime 和 ProviderForm 的产品态 ViewModel。
+- 本轮完成：`components/model-switcher.tsx` 改为消费 Provider ViewModel，不再直接依赖 `ModelProviderConfig` 或 `ModelProviderValidationResult`。
+- 本轮完成：`/settings` 页面改为从 provider feature mapper 获取渲染数据；Ollama 默认 `think=false`、`num_ctx`、`num_predict` 等后端写入细节收敛在创建 payload 附近，不散落在展示逻辑里。
+- 本轮修复：顺手清理 Settings provider preset 文案中的编码异常，替换为可读中文说明。
+- 本轮验证：`npm.cmd run typecheck:web` 与 `npm.cmd run build:web` 均通过。
+- 下一步建议：继续处理 Memories 页面，把 `MemoryRecord.metadata`、debug state、candidate/revision/fact 展示收敛到 `features/memories` mapper。
+
+### 2026-05-12: memory UI decoupling slice
+
+- 本轮目标：把 Memory 页面从 `MemoryRecord.metadata`、memory debug DTO、fact/revision/candidate 原始字段中解耦，方便后续重铸 Memory UI。
+- 本轮完成：新增 `apps/web/features/memories/view-models.ts` 和 `apps/web/features/memories/mappers.ts`，集中定义 MemoryItem、Episode、Fact、Revision、Candidate、ConflictGroup、ProfileSnapshot 和 Dashboard ViewModel。
+- 本轮完成：`/memories` 页面改为渲染 Memory ViewModel；label/source/state/score/dedupe/profile bucket/ledger 展示字段不再散落读取后端 metadata。
+- 本轮完成：memory state 更新通过 `buildMemoryStatePatch` 生成后端 patch，页面不再手写 metadata merge 逻辑。
+- 本轮说明：页面仍在 API 调用边界处发送 `memory_type`、读取 debug DTO 后立即映射，这是当前 REST DTO 边界的合理保留。
+- 本轮验证：`npm.cmd run typecheck:web` 与 `npm.cmd run build:web` 均通过。
+- 下一步建议：继续把 Imports/Training/Onboarding 页面切成 feature adapter；之后可考虑 OpenAPI 生成 DTO 类型，把 `packages/shared` 的手写后端影子类型降到最低。
+
+### 2026-05-13: frontend feature client boundary
+
+- Completed: added feature-level `client.ts` modules under `apps/web/features/*` so dashboard pages import request functions from their own feature boundary instead of directly from `apps/web/lib/api.ts`.
+- Completed: exported `API_BASE_URL` and `apiFetch` from `apps/web/lib/api.ts` as the shared transport layer.
+- Completed: `apps/web/features/imports/client.ts` now owns its concrete import endpoints directly; other feature clients currently delegate to `lib/api.ts` and can be migrated incrementally with the same pattern.
+- Completed: mapper type imports for Imports, Training, Persona, and Onboarding now reference feature clients rather than `@/lib/api`, keeping DTO knowledge inside feature boundaries.
+- Verification: `npm.cmd run typecheck:web` and `npm.cmd run build:web` both passed.
+- Next: gradually move endpoint implementations from `apps/web/lib/api.ts` into each feature client, then shrink `lib/api.ts` to transport plus truly shared DTO helpers.

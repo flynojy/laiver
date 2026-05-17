@@ -58,6 +58,14 @@ def _parse_tool_calls(payload: list[dict] | None) -> list[ModelToolCall]:
     return tool_calls
 
 
+def _error_detail(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        body = exc.response.text.strip()
+        if body:
+            return body
+    return str(exc)
+
+
 class BaseModelProvider(ABC):
     def __init__(
         self,
@@ -139,6 +147,147 @@ class BaseModelProvider(ABC):
     @abstractmethod
     async def stream(self, request: ModelCompletionRequest) -> AsyncIterator[str]:
         raise NotImplementedError
+
+
+def _ollama_options(request: ModelCompletionRequest, provider_settings: dict[str, Any]) -> dict[str, Any]:
+    options: dict[str, Any] = {
+        "temperature": request.temperature,
+        "num_predict": request.max_tokens,
+    }
+    for source_key, target_key in (
+        ("num_ctx", "num_ctx"),
+        ("num_gpu", "num_gpu"),
+        ("num_thread", "num_thread"),
+        ("top_k", "top_k"),
+        ("top_p", "top_p"),
+        ("repeat_penalty", "repeat_penalty"),
+        ("use_mmap", "use_mmap"),
+        ("main_gpu", "main_gpu"),
+    ):
+        if source_key in provider_settings:
+            options[target_key] = provider_settings[source_key]
+    return options
+
+
+def _coerce_bool_setting(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on", "enabled", "always"}:
+            return True
+        if normalized in {"0", "false", "no", "off", "disabled", "never"}:
+            return False
+    return None
+
+
+def _last_user_content(request: ModelCompletionRequest) -> str:
+    for message in reversed(request.messages):
+        if message.role == "user":
+            return message.content or ""
+    return request.messages[-1].content if request.messages else ""
+
+
+def _ollama_think_decision(request: ModelCompletionRequest, provider_settings: dict[str, Any]) -> dict[str, Any]:
+    for key in ("think", "ollama_think", "enable_thinking"):
+        if key in provider_settings:
+            override = _coerce_bool_setting(provider_settings[key])
+            if override is not None:
+                return {
+                    "enabled": override,
+                    "gate": "settings_override",
+                    "reason": key,
+                }
+
+    mode = str(provider_settings.get("think_mode", "auto")).strip().lower()
+    mode_override = _coerce_bool_setting(mode)
+    if mode_override is not None:
+        return {
+            "enabled": mode_override,
+            "gate": "settings_override",
+            "reason": "think_mode",
+        }
+    if mode and mode not in {"auto", "heuristic"}:
+        return {
+            "enabled": False,
+            "gate": "fast_reply",
+            "reason": f"unknown_think_mode:{mode}",
+        }
+
+    last_user = _last_user_content(request)
+    normalized = last_user.lower()
+    message_count = len(request.messages)
+    total_chars = sum(len(message.content or "") for message in request.messages)
+
+    if request.tools:
+        return {
+            "enabled": True,
+            "gate": "tool_or_memory_heavy",
+            "reason": "tools_attached",
+        }
+
+    if message_count >= 10 or total_chars >= 4000:
+        return {
+            "enabled": True,
+            "gate": "tool_or_memory_heavy",
+            "reason": "long_context",
+        }
+
+    reasoning_markers = (
+        "分析",
+        "推理",
+        "思考",
+        "为什么",
+        "怎麼",
+        "怎么",
+        "比较",
+        "权衡",
+        "规划",
+        "计划",
+        "方案",
+        "排查",
+        "诊断",
+        "复杂",
+        "多步",
+        "步骤",
+        "冲突",
+        "记忆",
+        "总结",
+        "debug",
+        "diagnose",
+        "reason",
+        "analyze",
+        "compare",
+        "tradeoff",
+        "plan",
+        "multi-step",
+    )
+    if any(marker in normalized for marker in reasoning_markers):
+        return {
+            "enabled": True,
+            "gate": "need_reasoning",
+            "reason": "reasoning_marker",
+        }
+
+    question_count = last_user.count("?") + last_user.count("？")
+    if question_count >= 2 or len(last_user) >= 240:
+        return {
+            "enabled": True,
+            "gate": "need_reasoning",
+            "reason": "question_or_length",
+        }
+
+    return {
+        "enabled": False,
+        "gate": "fast_reply",
+        "reason": "simple_or_short",
+    }
+
+
+def _ollama_think_enabled(request: ModelCompletionRequest, provider_settings: dict[str, Any]) -> bool:
+    return bool(_ollama_think_decision(request, provider_settings)["enabled"])
 
 
 class ChatCompletionsProvider(BaseModelProvider):
@@ -275,15 +424,24 @@ class OpenAICompatibleProvider(ChatCompletionsProvider):
 
 
 class OllamaProvider(BaseModelProvider):
+    def __init__(self, *, settings: dict[str, Any] | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.settings = settings or {}
+
     async def complete(self, request: ModelCompletionRequest) -> ModelCompletionResponse:
         if self.is_mock_transport:
             return await self._mock_complete(request)
 
+        think_decision = _ollama_think_decision(request, self.settings)
         payload = {
             "model": request.model or self.model_name,
             "messages": [_message_dump(message) for message in request.messages],
             "stream": False,
+            "think": think_decision["enabled"],
+            "options": _ollama_options(request, self.settings),
         }
+        if request.tools and self.supports_tool_calling:
+            payload["tools"] = [tool.model_dump() for tool in request.tools]
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -305,6 +463,9 @@ class OllamaProvider(BaseModelProvider):
                 "prompt_eval_count": data.get("prompt_eval_count"),
                 "eval_count": data.get("eval_count"),
                 "total_duration": data.get("total_duration"),
+                "think_enabled": think_decision["enabled"],
+                "think_gate": think_decision["gate"],
+                "think_reason": think_decision["reason"],
             },
         )
 
@@ -314,11 +475,16 @@ class OllamaProvider(BaseModelProvider):
                 yield chunk
             return
 
+        think_decision = _ollama_think_decision(request, self.settings)
         payload = {
             "model": request.model or self.model_name,
             "messages": [_message_dump(message) for message in request.messages],
             "stream": True,
+            "think": think_decision["enabled"],
+            "options": _ollama_options(request, self.settings),
         }
+        if request.tools and self.supports_tool_calling:
+            payload["tools"] = [tool.model_dump() for tool in request.tools]
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             async with client.stream(
@@ -465,6 +631,37 @@ class ModelRouterService:
             return "invalid_provider"
         return "provider_error"
 
+    def _provider_recommendation(
+        self,
+        *,
+        provider_type: ProviderType,
+        error_code: str | None,
+        error: str | None,
+    ) -> str | None:
+        error_text = (error or "").lower()
+        if provider_type == ProviderType.OLLAMA:
+            if "memory layout cannot be allocated" in error_text:
+                return (
+                    "Ollama reported a Windows runner memory-layout allocation failure. "
+                    "Reboot to clear resident GPU memory, then retry with a smaller num_ctx or model. "
+                    "If it still fails, use a smaller Qwen3 quant/model or move this runtime to WSL2/Linux."
+                )
+            if error_code == "provider_unreachable":
+                return "Start Ollama and confirm the API responds at /api/tags before validating this provider."
+            if error_code == "provider_unavailable":
+                return "Ollama is reachable but failed during generation. Check Ollama logs, GPU memory, model tag, and context size."
+        if error_code == "auth_failed":
+            return "Check the provider API key reference and restart the API after updating .env."
+        if error_code == "rate_limited":
+            return "The provider is rate limited. Retry later or switch the default provider temporarily."
+        if error_code == "timeout":
+            return "The provider did not finish in time. Lower max tokens/context or use a faster runtime."
+        if error_code == "provider_unreachable":
+            return "Confirm the provider base URL is correct and reachable from this machine."
+        if error_code == "provider_unavailable":
+            return "The provider returned a server error. Check provider status or use fallback while it recovers."
+        return None
+
     def _with_route_metadata(
         self,
         response: ModelCompletionResponse,
@@ -571,8 +768,9 @@ class ModelRouterService:
                 api_key="",
                 provider_name=ProviderType.OLLAMA.value,
                 requires_api_key=False,
-                supports_streaming=True,
+                supports_streaming=bool(provider_settings.get("supports_streaming", True)),
                 supports_tool_calling=bool(provider_settings.get("supports_tool_calling", False)),
+                settings=provider_settings,
             )
 
         if provider_row.provider_type == ProviderType.LOCAL_ADAPTER:
@@ -687,7 +885,9 @@ class ModelRouterService:
                 completion_ok=False,
                 stream_ok=False,
                 tool_call_ok=False,
+                error_code="api_key_missing",
                 error=f"{provider.provider_name.upper()} API key is not configured. Live validation was skipped.",
+                recommendation="Add the provider API key to .env, then restart the API before validating again.",
                 checked_at=checked_at,
             )
 
@@ -802,6 +1002,8 @@ class ModelRouterService:
                 checked_at=checked_at,
             )
         except Exception as exc:
+            error_code = self._classify_provider_error(exc)
+            error = _error_detail(exc)
             return ModelProviderValidationResponse(
                 provider_id=provider_row.id if provider_row else None,
                 provider_name=provider.name,
@@ -823,7 +1025,13 @@ class ModelRouterService:
                 stream_preview=stream_preview,
                 tool_calls=tool_calls,
                 usage=usage,
-                error=str(exc),
+                error_code=error_code,
+                error=error,
+                recommendation=self._provider_recommendation(
+                    provider_type=provider_type,
+                    error_code=error_code,
+                    error=error,
+                ),
                 checked_at=checked_at,
             )
 

@@ -2,12 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type {
-  LocalAdapterRuntimeState,
-  ModelProviderConfig,
-  ModelProviderValidationResult,
-  ProviderType
-} from "@agent/shared";
+import type { LocalAdapterRuntimeState, ModelProviderConfig } from "@agent/shared";
 
 import { ModelSwitcher } from "@/components/model-switcher";
 import { PageHeader } from "@/components/page-header";
@@ -17,80 +12,91 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  buildProviderForm,
+  toProviderCardViewModel,
+  toValidationViewModel
+} from "@/features/providers/mappers";
+import { PROVIDER_PRESETS } from "@/features/providers/view-models";
+import type {
+  LocalAdapterRuntimeViewModel,
+  ProviderCardViewModel,
+  ProviderFormState,
+  ProviderFormType,
+  ProviderValidationViewModel
+} from "@/features/providers/view-models";
+import {
   bootstrapModelProvider,
   createModelProvider,
   evictLocalAdapter,
-  listModelProviders,
   listLocalAdapterRuntime,
+  listModelProviders,
   updateModelProvider,
   validateModelProvider,
   warmLocalAdapter
-} from "@/lib/api";
-
-type ManualProviderType = Exclude<ProviderType, "local_adapter">;
-
-type ProviderFormState = {
-  name: string;
-  provider_type: ManualProviderType;
-  base_url: string;
-  model_name: string;
-  api_key_ref: string;
-  is_default: boolean;
-  is_enabled: boolean;
-};
-
-const PROVIDER_PRESETS: Record<
-  ManualProviderType,
-  { name: string; base_url: string; model_name: string; api_key_ref: string; helper: string }
-> = {
-  deepseek: {
-    name: "DeepSeek",
-    base_url: "https://api.deepseek.com",
-    model_name: "deepseek-chat",
-    api_key_ref: "env:DEEPSEEK_API_KEY",
-    helper: "适合直接接 DeepSeek 官方 API。"
-  },
-  openai_compatible: {
-    name: "OpenAI Compatible",
-    base_url: "https://api.openai.com/v1",
-    model_name: "gpt-4o-mini",
-    api_key_ref: "env:OPENAI_API_KEY",
-    helper: "适合 OpenAI、Groq、Together、Moonshot 等兼容 Chat Completions 的服务。"
-  },
-  ollama: {
-    name: "Ollama",
-    base_url: "http://localhost:11434",
-    model_name: "qwen2.5:7b",
-    api_key_ref: "",
-    helper: "适合本机 Ollama。默认走本地 `http://localhost:11434/api/chat`。"
-  }
-};
+} from "@/features/providers/client";
 
 function ValidationBadge({ label, ok }: { label: string; ok: boolean }) {
-  return <Badge>{label}: {ok ? "ok" : "pending"}</Badge>;
+  return (
+    <Badge>
+      {label}: {ok ? "ok" : "pending"}
+    </Badge>
+  );
 }
 
-function buildPresetForm(providerType: ManualProviderType): ProviderFormState {
-  const preset = PROVIDER_PRESETS[providerType];
+function RuntimeSummary({ runtime }: { runtime: LocalAdapterRuntimeViewModel }) {
+  return (
+    <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 text-xs text-sky-900">
+      <div className="flex flex-wrap gap-2">
+        <Badge>{runtime.status}</Badge>
+        {runtime.resident ? <Badge>resident</Badge> : <Badge>cold</Badge>}
+        {runtime.device ? <Badge>{runtime.device}</Badge> : null}
+      </div>
+      <p className="mt-2 break-all">adapter: {runtime.adapterPath}</p>
+      <p className="mt-1 break-all">base: {runtime.baseModel}</p>
+      <p className="mt-1">
+        loads {runtime.loadCount} / requests {runtime.requestCount} / active {runtime.activeRequestCount}
+      </p>
+      <p className="mt-1">
+        idle {runtime.idleSeconds}s / ttl {runtime.idleTimeoutSeconds}s / timeout {runtime.generateTimeoutSeconds}s
+      </p>
+      {runtime.memoryAllocatedMb != null || runtime.memoryReservedMb != null ? (
+        <p className="mt-1">
+          memory {runtime.memoryAllocatedMb ?? 0} MB / reserved {runtime.memoryReservedMb ?? 0} MB
+        </p>
+      ) : null}
+      {runtime.lastEvictionReason ? <p className="mt-1">last eviction: {runtime.lastEvictionReason}</p> : null}
+      {runtime.error ? <p className="mt-1 text-red-700">{runtime.error}</p> : null}
+    </div>
+  );
+}
+
+function providerSettingsFor(form: ProviderFormState) {
   return {
-    name: preset.name,
-    provider_type: providerType,
-    base_url: preset.base_url,
-    model_name: preset.model_name,
-    api_key_ref: preset.api_key_ref,
-    is_default: false,
-    is_enabled: true
+    supports_streaming: true,
+    supports_tool_calling: form.providerType !== "ollama",
+    ...(form.providerType === "ollama" ? { num_ctx: 1024, num_predict: 256, think: false } : {})
   };
 }
 
 export default function SettingsPage() {
   const [providers, setProviders] = useState<ModelProviderConfig[]>([]);
   const [runtimeStates, setRuntimeStates] = useState<LocalAdapterRuntimeState[]>([]);
-  const [validation, setValidation] = useState<ModelProviderValidationResult | null>(null);
+  const [validation, setValidation] = useState<ProviderValidationViewModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeProviderId, setActiveProviderId] = useState("");
-  const [form, setForm] = useState<ProviderFormState>(buildPresetForm("openai_compatible"));
+  const [form, setForm] = useState<ProviderFormState>(buildProviderForm("openai_compatible"));
+
+  const providerCards = useMemo(() => {
+    const runtimeByProviderId = new Map(runtimeStates.map((item) => [item.provider_id, item]));
+    return providers.map((provider) => toProviderCardViewModel(provider, provider.id ? runtimeByProviderId.get(provider.id) : null));
+  }, [providers, runtimeStates]);
+
+  const activeProvider = useMemo<ProviderCardViewModel | null>(
+    () => providerCards.find((provider) => provider.id === activeProviderId) ?? providerCards[0] ?? null,
+    [activeProviderId, providerCards]
+  );
+  const activePreset = PROVIDER_PRESETS[form.providerType];
 
   async function refreshProviders(activeId?: string) {
     await bootstrapModelProvider();
@@ -106,29 +112,21 @@ export default function SettingsPage() {
     });
   }, []);
 
-  const activeProvider = useMemo(
-    () => providers.find((provider) => provider.id === activeProviderId) ?? providers[0] ?? null,
-    [activeProviderId, providers]
-  );
-  const runtimeStateByProviderId = useMemo(
-    () => new Map(runtimeStates.map((item) => [item.provider_id, item])),
-    [runtimeStates]
-  );
-  const activePreset = PROVIDER_PRESETS[form.provider_type];
-
   async function handleCreateProvider() {
     setLoading(true);
     setError("");
     try {
       const created = await createModelProvider({
-        ...form,
-        api_key_ref: form.api_key_ref || null,
-        settings: {
-          supports_streaming: form.provider_type !== "ollama" ? true : true,
-          supports_tool_calling: form.provider_type !== "ollama"
-        }
+        name: form.name,
+        provider_type: form.providerType,
+        base_url: form.baseUrl,
+        model_name: form.modelName,
+        api_key_ref: form.apiKeyRef || null,
+        is_default: form.isDefault,
+        is_enabled: form.isEnabled,
+        settings: providerSettingsFor(form)
       });
-      setForm(buildPresetForm(form.provider_type));
+      setForm(buildProviderForm(form.providerType));
       await refreshProviders(created.id);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Provider creation failed.");
@@ -155,7 +153,7 @@ export default function SettingsPage() {
     setError("");
     try {
       const result = await validateModelProvider(providerId ? { provider_id: providerId } : {});
-      setValidation(result);
+      setValidation(toValidationViewModel(result));
       await refreshProviders(providerId ?? activeProviderId);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Provider validation failed.");
@@ -232,56 +230,28 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {providers.map((provider) => (
-              <div key={provider.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
-                {provider.provider_type === "local_adapter" && provider.id ? (
-                  (() => {
-                    const runtimeState = runtimeStateByProviderId.get(provider.id);
-                    return runtimeState ? (
-                      <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 text-xs text-sky-900">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge>{runtimeState.status}</Badge>
-                          {runtimeState.resident ? <Badge>resident</Badge> : <Badge>cold</Badge>}
-                          {runtimeState.device ? <Badge>{runtimeState.device}</Badge> : null}
-                        </div>
-                        <p className="mt-2 break-all">adapter: {runtimeState.adapter_path}</p>
-                        <p className="mt-1 break-all">base: {runtimeState.base_model}</p>
-                        <p className="mt-1">
-                          loads {runtimeState.load_count} / requests {runtimeState.request_count} / active {runtimeState.active_request_count}
-                        </p>
-                        <p className="mt-1">
-                          idle {runtimeState.idle_seconds ?? 0}s / ttl {runtimeState.idle_timeout_seconds}s / timeout {runtimeState.generate_timeout_seconds}s
-                        </p>
-                        {runtimeState.memory_allocated_mb != null || runtimeState.memory_reserved_mb != null ? (
-                          <p className="mt-1">
-                            memory {runtimeState.memory_allocated_mb ?? 0} MB / reserved {runtimeState.memory_reserved_mb ?? 0} MB
-                          </p>
-                        ) : null}
-                        {runtimeState.last_eviction_reason ? (
-                          <p className="mt-1">
-                            last eviction: {runtimeState.last_eviction_reason}
-                          </p>
-                        ) : null}
-                        {runtimeState.error ? <p className="mt-1 text-[var(--danger)]">{runtimeState.error}</p> : null}
-                      </div>
-                    ) : null;
-                  })()
+            {providerCards.map((provider) => (
+              <div key={provider.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+                {provider.runtime ? (
+                  <div className="mb-4">
+                    <RuntimeSummary runtime={provider.runtime} />
+                  </div>
                 ) : null}
                 <button className="w-full text-left" onClick={() => setActiveProviderId(provider.id ?? "")}>
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{provider.provider_type}</Badge>
-                    {provider.is_default ? <Badge>default</Badge> : null}
-                    {provider.is_enabled ? <Badge>enabled</Badge> : <Badge>disabled</Badge>}
+                    <Badge>{provider.providerType}</Badge>
+                    {provider.isDefault ? <Badge>default</Badge> : null}
+                    {provider.isEnabled ? <Badge>enabled</Badge> : <Badge>disabled</Badge>}
                   </div>
                   <p className="mt-3 font-medium">{provider.name}</p>
-                  <p className="mt-2 text-sm text-[var(--muted-foreground)]">{provider.model_name}</p>
-                  <p className="mt-2 break-all text-xs text-[var(--muted-foreground)]">{provider.base_url}</p>
-                  {provider.api_key_ref ? (
-                    <p className="mt-2 break-all text-xs text-[var(--muted-foreground)]">key ref: {provider.api_key_ref}</p>
+                  <p className="mt-2 text-sm text-[var(--muted-foreground)]">{provider.modelName}</p>
+                  <p className="mt-2 break-all text-xs text-[var(--muted-foreground)]">{provider.baseUrl}</p>
+                  {provider.apiKeyRef ? (
+                    <p className="mt-2 break-all text-xs text-[var(--muted-foreground)]">key ref: {provider.apiKeyRef}</p>
                   ) : null}
                 </button>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  {!provider.is_default ? (
+                  {!provider.isDefault ? (
                     <Button variant="secondary" disabled={loading} onClick={() => handleQuickAction(provider.id ?? "", { is_default: true })}>
                       Set Default
                     </Button>
@@ -289,19 +259,19 @@ export default function SettingsPage() {
                   <Button
                     variant="secondary"
                     disabled={loading}
-                    onClick={() => handleQuickAction(provider.id ?? "", { is_enabled: !provider.is_enabled })}
+                    onClick={() => handleQuickAction(provider.id ?? "", { is_enabled: !provider.isEnabled })}
                   >
-                    {provider.is_enabled ? "Disable" : "Enable"}
+                    {provider.isEnabled ? "Disable" : "Enable"}
                   </Button>
                   <Button variant="secondary" disabled={loading} onClick={() => handleValidate(provider.id)}>
                     Validate
                   </Button>
-                  {provider.provider_type === "local_adapter" && provider.id ? (
+                  {provider.providerType === "local_adapter" && provider.id ? (
                     <Button variant="secondary" disabled={loading} onClick={() => handleWarmLocalAdapter(provider.id ?? "")}>
                       Warm
                     </Button>
                   ) : null}
-                  {provider.provider_type === "local_adapter" && provider.id ? (
+                  {provider.providerType === "local_adapter" && provider.id ? (
                     <Button variant="secondary" disabled={loading} onClick={() => handleEvictLocalAdapter(provider.id ?? "")}>
                       Evict
                     </Button>
@@ -314,7 +284,7 @@ export default function SettingsPage() {
 
         <div className="space-y-4">
           <ModelSwitcher
-            providers={providers}
+            providers={providerCards}
             selectedProviderId={activeProviderId}
             validation={validation}
             loading={loading}
@@ -335,9 +305,9 @@ export default function SettingsPage() {
                 <Label htmlFor="provider-type">Provider Type</Label>
                 <select
                   id="provider-type"
-                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm"
-                  value={form.provider_type}
-                  onChange={(event) => setForm(buildPresetForm(event.target.value as ManualProviderType))}
+                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                  value={form.providerType}
+                  onChange={(event) => setForm(buildProviderForm(event.target.value as ProviderFormType))}
                 >
                   <option value="openai_compatible">OpenAI Compatible</option>
                   <option value="deepseek">DeepSeek</option>
@@ -359,8 +329,8 @@ export default function SettingsPage() {
                 <Label htmlFor="provider-base-url">Base URL</Label>
                 <Input
                   id="provider-base-url"
-                  value={form.base_url}
-                  onChange={(event) => setForm((current) => ({ ...current, base_url: event.target.value }))}
+                  value={form.baseUrl}
+                  onChange={(event) => setForm((current) => ({ ...current, baseUrl: event.target.value }))}
                 />
               </div>
 
@@ -368,8 +338,8 @@ export default function SettingsPage() {
                 <Label htmlFor="provider-model">Model Name</Label>
                 <Input
                   id="provider-model"
-                  value={form.model_name}
-                  onChange={(event) => setForm((current) => ({ ...current, model_name: event.target.value }))}
+                  value={form.modelName}
+                  onChange={(event) => setForm((current) => ({ ...current, modelName: event.target.value }))}
                 />
               </div>
 
@@ -377,9 +347,9 @@ export default function SettingsPage() {
                 <Label htmlFor="provider-api-key-ref">API Key Ref</Label>
                 <Input
                   id="provider-api-key-ref"
-                  value={form.api_key_ref}
-                  placeholder={form.provider_type === "ollama" ? "Leave empty for local Ollama" : "env:OPENAI_API_KEY"}
-                  onChange={(event) => setForm((current) => ({ ...current, api_key_ref: event.target.value }))}
+                  value={form.apiKeyRef}
+                  placeholder={form.providerType === "ollama" ? "Leave empty for local Ollama" : "env:OPENAI_API_KEY"}
+                  onChange={(event) => setForm((current) => ({ ...current, apiKeyRef: event.target.value }))}
                 />
                 <p className="text-xs text-[var(--muted-foreground)]">
                   Use `env:YOUR_KEY_NAME` or `literal:actual-key`. Ollama can stay empty.
@@ -389,8 +359,8 @@ export default function SettingsPage() {
               <label className="flex items-center gap-3 text-sm">
                 <input
                   type="checkbox"
-                  checked={form.is_default}
-                  onChange={(event) => setForm((current) => ({ ...current, is_default: event.target.checked }))}
+                  checked={form.isDefault}
+                  onChange={(event) => setForm((current) => ({ ...current, isDefault: event.target.checked }))}
                 />
                 Set as default provider
               </label>
@@ -398,8 +368,8 @@ export default function SettingsPage() {
               <label className="flex items-center gap-3 text-sm">
                 <input
                   type="checkbox"
-                  checked={form.is_enabled}
-                  onChange={(event) => setForm((current) => ({ ...current, is_enabled: event.target.checked }))}
+                  checked={form.isEnabled}
+                  onChange={(event) => setForm((current) => ({ ...current, isEnabled: event.target.checked }))}
                 />
                 Enable immediately
               </label>
@@ -420,41 +390,46 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     <Badge>{validation.mode}</Badge>
-                    <Badge>{validation.health_status}</Badge>
-                    <Badge>{validation.provider_type}</Badge>
-                    <ValidationBadge label="completion" ok={validation.completion_ok} />
-                    <ValidationBadge label="stream" ok={validation.stream_ok} />
-                    <ValidationBadge label="tool" ok={validation.tool_call_ok} />
+                    <Badge>{validation.healthStatus}</Badge>
+                    <Badge>{validation.providerType}</Badge>
+                    <ValidationBadge label="completion" ok={validation.completionOk} />
+                    <ValidationBadge label="stream" ok={validation.streamOk} />
+                    <ValidationBadge label="tool" ok={validation.toolCallOk} />
                   </div>
                   <p className="text-sm text-[var(--muted-foreground)]">
-                    {validation.provider_name} / {validation.model_name}
+                    {validation.providerName} / {validation.modelName}
                   </p>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    API key configured: {validation.api_key_configured ? "yes" : "no"}
+                    API key configured: {validation.apiKeyConfigured ? "yes" : "no"}
                   </p>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    Route: {validation.route_policy} · Fallback: {validation.fallback_policy}
-                    {validation.fallback_available ? " available" : " unavailable"}
+                    Route: {validation.routePolicy} / Fallback: {validation.fallbackPolicy}
+                    {validation.fallbackAvailable ? " available" : " unavailable"}
                   </p>
                   <div className="space-y-3 text-xs text-[var(--muted-foreground)]">
                     <div>
                       <p className="font-medium text-[color:var(--foreground)]">Completion Preview</p>
-                      <p className="mt-1 whitespace-pre-wrap">{validation.completion_preview || "No completion content returned."}</p>
+                      <p className="mt-1 whitespace-pre-wrap">{validation.completionPreview || "No completion content returned."}</p>
                     </div>
                     <div>
                       <p className="font-medium text-[color:var(--foreground)]">Stream Preview</p>
-                      <p className="mt-1 whitespace-pre-wrap">{validation.stream_preview || "No stream content returned."}</p>
+                      <p className="mt-1 whitespace-pre-wrap">{validation.streamPreview || "No stream content returned."}</p>
                     </div>
                     <div>
                       <p className="font-medium text-[color:var(--foreground)]">Tool Calls</p>
-                      <pre className="mt-1 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 leading-6">
-                        {JSON.stringify(validation.tool_calls, null, 2)}
+                      <pre className="mt-1 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 leading-6">
+                        {validation.toolCallsJson}
                       </pre>
                     </div>
                   </div>
-                  {validation.error ? (
-                    <p className="rounded-2xl border border-[var(--warning)] bg-[color:var(--warning)]/10 px-3 py-2 text-xs text-[var(--warning)]">
-                      {validation.error}
+                  {validation.errorLabel ? (
+                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      {validation.errorLabel}
+                    </p>
+                  ) : null}
+                  {validation.recommendation ? (
+                    <p className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                      {validation.recommendation}
                     </p>
                   ) : null}
                 </div>
@@ -467,42 +442,16 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {activeProvider?.provider_type === "local_adapter" && activeProvider.id ? (
-            <Card className="bg-[var(--surface)]">
+          {activeProvider?.providerType === "local_adapter" && activeProvider.id ? (
+            <Card className="bg-white/88">
               <CardHeader>
                 <CardTitle>Resident Runtime</CardTitle>
                 <CardDescription>Keep the selected local adapter warm in memory so reply latency stays stable between turns.</CardDescription>
               </CardHeader>
               <CardContent>
-                {runtimeStateByProviderId.get(activeProvider.id) ? (
-                  <div className="space-y-3 text-sm">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge>{runtimeStateByProviderId.get(activeProvider.id)?.status}</Badge>
-                      {runtimeStateByProviderId.get(activeProvider.id)?.resident ? <Badge>resident</Badge> : <Badge>cold</Badge>}
-                      {runtimeStateByProviderId.get(activeProvider.id)?.device ? (
-                        <Badge>{runtimeStateByProviderId.get(activeProvider.id)?.device}</Badge>
-                      ) : null}
-                    </div>
-                    <p className="break-all text-[var(--muted-foreground)]">
-                      {runtimeStateByProviderId.get(activeProvider.id)?.adapter_path}
-                    </p>
-                    <p className="text-[var(--muted-foreground)]">
-                      load {runtimeStateByProviderId.get(activeProvider.id)?.load_count} / request{" "}
-                      {runtimeStateByProviderId.get(activeProvider.id)?.request_count} / active{" "}
-                      {runtimeStateByProviderId.get(activeProvider.id)?.active_request_count}
-                    </p>
-                    <p className="text-[var(--muted-foreground)]">
-                      idle {runtimeStateByProviderId.get(activeProvider.id)?.idle_seconds ?? 0}s / ttl{" "}
-                      {runtimeStateByProviderId.get(activeProvider.id)?.idle_timeout_seconds}s / timeout{" "}
-                      {runtimeStateByProviderId.get(activeProvider.id)?.generate_timeout_seconds}s
-                    </p>
-                    {runtimeStateByProviderId.get(activeProvider.id)?.memory_allocated_mb != null ||
-                    runtimeStateByProviderId.get(activeProvider.id)?.memory_reserved_mb != null ? (
-                      <p className="text-[var(--muted-foreground)]">
-                        memory {runtimeStateByProviderId.get(activeProvider.id)?.memory_allocated_mb ?? 0} MB / reserved{" "}
-                        {runtimeStateByProviderId.get(activeProvider.id)?.memory_reserved_mb ?? 0} MB
-                      </p>
-                    ) : null}
+                {activeProvider.runtime ? (
+                  <div className="space-y-3">
+                    <RuntimeSummary runtime={activeProvider.runtime} />
                     <div className="flex flex-wrap gap-3">
                       <Button disabled={loading} onClick={() => handleWarmLocalAdapter(activeProvider.id ?? "")}>
                         Warm Selected

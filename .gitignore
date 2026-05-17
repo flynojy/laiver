@@ -1,6 +1,7 @@
 node_modules/
 .pip-cache/
 .tmp/
+.claude/
 .next/
 dist/
 build/
