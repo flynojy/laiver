@@ -4,8 +4,8 @@
 
 :root {
   --background: #f4efe3;
-  --surface: #ffffff;
-  --surface-2: #faf6ec;
+  --surface: rgba(255, 255, 255, 0.9);
+  --surface-2: rgba(250, 246, 236, 0.82);
   --foreground: #0b1220;
   --foreground-muted: #5a6478;
   --border: rgba(11, 18, 32, 0.08);
@@ -77,18 +77,27 @@
 }
 
 html {
-  font-family: var(--font-sans, "Geist"), "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: var(--font-sans), "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(var(--halo-primary), 0.14), transparent 30%),
+    linear-gradient(rgba(244, 239, 227, 0.54), rgba(244, 239, 227, 0.72)),
+    radial-gradient(circle at top left, rgba(var(--halo-primary), 0.16), transparent 30%),
     radial-gradient(circle at bottom right, rgba(var(--halo-secondary), 0.12), transparent 28%),
+    url("/backgrounds/asuka-light.webp") center top / cover fixed no-repeat,
     var(--background);
   color: var(--foreground);
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgba(var(--halo-primary), 0.14), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(var(--halo-secondary), 0.12), transparent 28%),
+    var(--background);
 }
 
 a {

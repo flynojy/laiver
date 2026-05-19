@@ -44,7 +44,7 @@ function JsonPanel({ title, json }: { title: string; json: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
         {title}
       </p>
-      <pre className="mt-2 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+      <pre className="mt-2 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
         {json}
       </pre>
     </div>
@@ -59,7 +59,7 @@ function MappingList({ mappings }: { mappings: ConnectorMappingViewModel[] }) {
   return (
     <div className="space-y-3">
       {mappings.map((item) => (
-        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
           <div className="flex flex-wrap gap-2">
             {item.badges.map((badge) => (
               <Badge key={badge}>{badge}</Badge>
@@ -82,7 +82,7 @@ function DeliveryList({ deliveries }: { deliveries: ConnectorDeliveryViewModel[]
   return (
     <div className="space-y-3">
       {deliveries.map((item) => (
-        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
           <div className="flex flex-wrap gap-2">
             {item.badges.map((badge) => (
               <Badge key={badge}>{badge}</Badge>
@@ -225,7 +225,7 @@ export default function ConnectorsPage() {
             </CardDescription>
           </CardHeader>
             <CardContent className="space-y-4">
-            <pre className="overflow-x-auto rounded-[1.25rem] bg-[#faf8f4] p-4 text-xs leading-6">{toJson(skeleton ?? {})}</pre>
+            <pre className="overflow-x-auto rounded-[1.25rem] bg-[var(--surface-2)] p-4 text-xs leading-6">{toJson(skeleton ?? {})}</pre>
             <Button
               className="w-full"
               disabled={!userId || loading}
@@ -269,7 +269,7 @@ export default function ConnectorsPage() {
               {connectorCards.map((connector) => (
                 <button
                   key={connector.id}
-                  className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
+                  className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] px-4 py-4 text-left"
                   onClick={async () => {
                     setActiveConnectorId(connector.id);
                     await refresh(connector.id);

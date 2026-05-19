@@ -21,7 +21,9 @@ import { HexGrid } from "@/components/glyphs/HexGrid";
 import { Mask02 } from "@/components/glyphs/Mask02";
 import { NervMark } from "@/components/glyphs/NervMark";
 import { SyncBars } from "@/components/glyphs/SyncBars";
+import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useI18n } from "@/features/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 const navItems: ReadonlyArray<{
@@ -44,9 +46,10 @@ const navItems: ReadonlyArray<{
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div className="min-h-screen bg-transparent text-[var(--foreground)]">
       <div className="mx-auto flex min-h-screen max-w-[1600px] gap-6 px-4 py-4 sm:px-6">
         <aside className="relative hidden w-[300px] shrink-0 flex-col overflow-hidden rounded-[20px] border border-[color:var(--sidebar-border)] bg-[var(--sidebar-bg)] text-[var(--sidebar-fg)] shadow-panel lg:flex">
           {/* hex grid watermark */}
@@ -71,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="mt-4 flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--sidebar-muted)]">
               <span className="inline-block h-1.5 w-1.5 animate-pulse-glow rounded-full bg-[var(--success)]" />
-              <span>SYSTEM ONLINE</span>
+              <span>{t("SYSTEM ONLINE")}</span>
               <span className="ml-auto">v0.1</span>
             </div>
           </div>
@@ -101,7 +104,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {active ? "▶" : "·"}
                   </span>
                   <Icon className="h-3.5 w-3.5" />
-                  <span className="flex-1">{item.label}</span>
+                  <span className="flex-1">{t(item.label)}</span>
                   <span className="font-mono text-[9px] opacity-50">{item.tag}</span>
                 </Link>
               );
@@ -116,7 +119,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
               <div className="relative">
                 <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-[var(--sidebar-muted)]">
-                  PILOT // 02
+                  {t("PILOT // 02")}
                 </p>
                 <p className="mt-1 font-mono text-sm font-semibold text-[var(--sidebar-fg)]">
                   SORYU
@@ -124,7 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-end justify-between gap-2">
                     <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--sidebar-muted)]">
-                      SYNC RATIO
+                      {t("SYNC RATIO")}
                     </span>
                     <span className="font-mono text-[18px] font-semibold leading-none text-[var(--sidebar-accent)]">
                       87.4
@@ -139,7 +142,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--success)]">
-                      ● STABLE
+                      ● {t("STABLE")}
                     </span>
                     <SyncBars className="text-[var(--sidebar-accent)]" />
                   </div>
@@ -152,9 +155,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="min-w-0 flex-1">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--foreground-muted)]">
-              <span className="text-[var(--accent)]">▶</span> NERV TERMINAL · TOKYO-3
+              <span className="text-[var(--accent)]">▶</span> {t("NERV TERMINAL · TOKYO-3")}
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <LanguageToggle />
+              <ThemeToggle />
+            </div>
           </div>
           {children}
         </main>

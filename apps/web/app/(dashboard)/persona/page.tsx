@@ -417,11 +417,11 @@ export default function PersonaPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Saved Persona Preview</Label>
-                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{preview.savedPreview}</pre>
+                  <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-4 text-xs leading-6">{preview.savedPreview}</pre>
                 </div>
                 <div className="space-y-2">
                   <Label>Edited Draft Preview</Label>
-                  <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-4 text-xs leading-6">{preview.draftPreview}</pre>
+                  <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-4 text-xs leading-6">{preview.draftPreview}</pre>
                 </div>
               </div>
             </CardContent>

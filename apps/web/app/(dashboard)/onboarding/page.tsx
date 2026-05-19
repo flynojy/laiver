@@ -356,7 +356,7 @@ export default function OnboardingPage() {
                       {recentImports.map((item) => (
                         <button
                           key={item.id}
-                          className="w-full rounded-md border border-[color:var(--border)] bg-white px-3 py-2 text-left"
+                          className="w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-[var(--foreground)]"
                           onClick={() => {
                             setCommittedImport(imports.find((row) => row.import_job.id === item.id) ?? null);
                             setStep("persona");
@@ -391,7 +391,7 @@ export default function OnboardingPage() {
                     <div className="space-y-2">
                       <Label>Import</Label>
                       <select
-                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                        className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)]"
                         value={selectedImportOption?.id ?? ""}
                         onChange={(event) => {
                           const next = imports.find((item) => item.import_job.id === event.target.value) ?? null;
@@ -420,7 +420,7 @@ export default function OnboardingPage() {
                       </select>
                     </div>
                     {personaViewModel ? (
-                      <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                      <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
                         <div className="flex flex-wrap gap-2">
                           {personaViewModel.badges.map((item) => (
                             <Badge key={item}>{item}</Badge>
@@ -464,7 +464,7 @@ export default function OnboardingPage() {
                   </p>
                 </div>
                 {trainingJobViewModel ? (
-                  <div className="rounded-md border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm">
+                  <div className="rounded-md border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm">
                     <div className="flex flex-wrap gap-2">
                       <Badge>{trainingJobViewModel.status}</Badge>
                       <Badge>{trainingJobViewModel.backend}</Badge>

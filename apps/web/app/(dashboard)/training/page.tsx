@@ -41,7 +41,7 @@ function DatasetPreview({ detail }: { detail: TrainingJobDetailViewModel | null 
   return (
     <div className="space-y-4">
       {detail.datasetSamples.map((sample) => (
-        <div key={sample.id} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+        <div key={sample.id} className="rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
           <p className="text-sm font-medium">{sample.label}</p>
           <div className="mt-3 space-y-2 text-sm">
             {sample.messages.map((message, messageIndex) => (
@@ -229,14 +229,14 @@ export default function TrainingPage() {
       {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
       {status ? <div className="rounded-2xl border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">{status}</div> : null}
 
-      <Card className="bg-white/88">
+      <Card className="bg-[var(--surface)]">
         <CardHeader>
           <CardTitle>Training Flow</CardTitle>
           <CardDescription>The dataset, local runner, provider registration, and default switch are kept in one chain.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {workflowStages.map((stage) => (
-            <div key={stage.title} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+            <div key={stage.title} className="rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
               <div className="flex flex-wrap gap-2">
                 <Badge>{stage.title}</Badge>
                 <Badge>{stage.done ? "done" : "pending"}</Badge>
@@ -404,13 +404,13 @@ export default function TrainingPage() {
                     </div>
                   </div>
                   {detail.artifactPath ? (
-                    <div className="rounded-[1rem] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    <div className="rounded-[1rem] border border-[var(--success)] bg-[color:var(--success)]/10 p-4 text-sm text-[var(--foreground)]">
                       <p className="font-medium">Adapter Artifact</p>
                       <p className="mt-2 break-all">{detail.artifactPath}</p>
                     </div>
                   ) : null}
                   {detail.registeredProvider ? (
-                    <div className="rounded-[1rem] border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                    <div className="rounded-[1rem] border border-[var(--accent)] bg-[var(--accent-soft)] p-4 text-sm text-[var(--foreground)]">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium">Registered Provider</p>
                         <Badge>{detail.registeredProvider.providerType}</Badge>
@@ -418,7 +418,7 @@ export default function TrainingPage() {
                         {detail.registeredProvider.isEnabled ? <Badge>enabled</Badge> : <Badge>disabled</Badge>}
                       </div>
                       <p className="mt-2">{detail.registeredProvider.name}</p>
-                      <p className="mt-2 break-all text-xs text-sky-700">{detail.registeredProvider.baseUrl}</p>
+                      <p className="mt-2 break-all text-xs text-[var(--foreground-muted)]">{detail.registeredProvider.baseUrl}</p>
                       {!detail.registeredProvider.isDefault ? (
                         <div className="mt-3">
                           <Button variant="secondary" disabled={loading} onClick={handleSetRegisteredProviderDefault}>
@@ -429,7 +429,7 @@ export default function TrainingPage() {
                     </div>
                   ) : null}
                   {detail.errorMessage ? (
-                    <div className="rounded-[1rem] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div className="rounded-[1rem] border border-[var(--danger)] bg-[color:var(--danger)]/10 p-4 text-sm text-[var(--danger)]">
                       <p className="font-medium">Last Error</p>
                       <p className="mt-2 whitespace-pre-wrap">{detail.errorMessage}</p>
                     </div>

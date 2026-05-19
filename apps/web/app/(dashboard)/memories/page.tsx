@@ -241,14 +241,14 @@ export default function MemoriesPage() {
       {error ? <div className="rounded-2xl border border-[var(--danger)] bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">{error}</div> : null}
       {status ? <div className="rounded-2xl border border-[var(--success)] bg-[color:var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">{status}</div> : null}
 
-      <Card className="bg-white/88">
+      <Card className="bg-[var(--surface)]">
         <CardHeader>
           <CardTitle>Memory Flow</CardTitle>
           <CardDescription>Writes are captured as episodes first, promoted to candidates and facts, then recalled through the profile and vector index.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           {memoryPipeline.map((step) => (
-            <div key={step.title} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+            <div key={step.title} className="rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
               <p className="text-sm font-medium">{step.title}</p>
               <p className="mt-2 text-lg font-semibold">{step.value}</p>
               <p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">{step.detail}</p>
@@ -386,7 +386,7 @@ export default function MemoriesPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {dashboard.profileSummary ? (
-                <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4 text-sm leading-6">
+                <div className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4 text-sm leading-6">
                   <p className="whitespace-pre-wrap">{dashboard.profileSummary}</p>
                 </div>
               ) : (
@@ -396,7 +396,7 @@ export default function MemoriesPage() {
               {dashboard.profileBuckets.length > 0 ? (
                 <div className="grid gap-3 md:grid-cols-3">
                   {dashboard.profileBuckets.map((bucket) => (
-                    <div key={bucket.bucket} className="rounded-[1rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+                    <div key={bucket.bucket} className="rounded-[1rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
                       <p className="text-sm font-medium capitalize">{bucket.bucket}</p>
                       <div className="mt-3 space-y-2 text-sm text-[var(--muted-foreground)]">
                         {bucket.entries.length > 0 ? (
@@ -425,7 +425,7 @@ export default function MemoriesPage() {
                   {dashboard.userProfile.sourceFactCount ? <Badge>{dashboard.userProfile.sourceFactCount} facts</Badge> : null}
                 </div>
                 {!dashboard.userProfile.isEmpty ? (
-                  <pre className="overflow-x-auto rounded-[1rem] bg-[#faf8f4] p-3 text-xs leading-6">
+                  <pre className="overflow-x-auto rounded-[1rem] bg-[var(--surface-2)] p-3 text-xs leading-6">
                     {dashboard.userProfile.json}
                   </pre>
                 ) : (
@@ -444,7 +444,7 @@ export default function MemoriesPage() {
                   ) : null}
                 </div>
                 {!dashboard.relationshipState.isEmpty ? (
-                  <pre className="overflow-x-auto rounded-[1rem] bg-[#faf8f4] p-3 text-xs leading-6">
+                  <pre className="overflow-x-auto rounded-[1rem] bg-[var(--surface-2)] p-3 text-xs leading-6">
                     {dashboard.relationshipState.json}
                   </pre>
                 ) : (
@@ -632,7 +632,7 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No conflict groups yet.</p>
               ) : (
                 dashboard.conflictGroups.map((group) => (
-                  <div key={group.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div key={group.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
                     <p className="text-sm font-medium">{group.label}</p>
                     <div className="mt-3 space-y-2">
                       {group.items.map((item) => (
@@ -662,11 +662,11 @@ export default function MemoriesPage() {
                 <p className="text-sm text-[var(--muted-foreground)]">No duplicate groups in the current filtered set.</p>
               ) : (
                 duplicateGroups.map((group) => (
-                  <div key={group.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+                  <div key={group.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
                     <p className="text-sm font-medium">{group.label}</p>
                     <div className="mt-3 space-y-2">
                       {group.items.map((memory) => (
-                        <div key={memory.id} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
+                        <div key={memory.id} className="rounded-2xl bg-[var(--surface-2)] p-3 text-sm leading-6">
                           <div className="flex flex-wrap gap-2">
                             <Badge>{memory.label}</Badge>
                             <Badge>{memory.state}</Badge>

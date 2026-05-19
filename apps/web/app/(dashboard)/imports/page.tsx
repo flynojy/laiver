@@ -124,7 +124,7 @@ export default function ImportsPage() {
             </label>
 
             {previewView ? (
-              <div className="rounded-[1.5rem] border border-[color:var(--border)] bg-[#faf8f4] p-4 text-sm">
+              <div className="rounded-[1.5rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4 text-sm">
                 <p className="font-medium">{previewView.fileName}</p>
                 <p className="mt-2 text-[var(--muted-foreground)]">
                   {previewView.totalMessages} messages, participants: {previewView.participants.join(" / ") || "unknown"}
@@ -216,7 +216,7 @@ export default function ImportsPage() {
                 importCards.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4"
+                    className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">{item.fileName}</p>
