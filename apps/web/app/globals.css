@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 :root {
+  /* Self-hosted Geist (via geist npm package) → expose under abstract names */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
   --background: #f4efe3;
   --surface: rgba(255, 255, 255, 0.9);
   --surface-2: rgba(250, 246, 236, 0.82);

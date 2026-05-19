@@ -1,11 +1,15 @@
 "use client";
 
 import {
+  Children,
+  cloneElement,
   createContext,
+  isValidElement,
   useContext,
   useEffect,
   useMemo,
   useState,
+  type ReactElement,
   type ReactNode
 } from "react";
 
@@ -92,12 +96,20 @@ function translateText(value: string, language: Language) {
   return preserveWhitespace(value, applyDynamicTranslation(trimmed, language));
 }
 
-// Shallow translation: only translate string / number / array-of-primitives that are
-// passed *directly* as children to a translated primitive (Badge, CardTitle, etc.).
-// Nested React elements are returned as-is — their own translated primitives (or
-// explicit t() calls in page code) handle their own subtree. This avoids the
-// O(N) cloneElement walk over deep JSX trees on every render while preserving
-// the "<Badge>literal</Badge>" auto-translation that call sites rely on.
+// Tags whose textual contents must stay verbatim (code samples, scripts, styles).
+const SKIP_TRANSLATION_TAGS = new Set(["code", "pre", "script", "style"]);
+
+// Bounded translation: recurse only through plain HTML wrappers (`<p>`, `<div>`,
+// `<span>`, headings, etc.) so common patterns like
+//   <CardContent>
+//     <p className="...">No run yet.</p>
+//   </CardContent>
+// still translate the inner literal — but stop at React component boundaries so
+// we never walk an arbitrarily deep component subtree on every render (the
+// original behavior caused both a perf hit on dense pages like Memories and key
+// instability inside keyed lists). Components are expected to translate their
+// own literal children via their own `tNode` hookup (Card primitives) or via
+// explicit `t()` calls in the page code.
 function translateReactNode(node: ReactNode, language: Language): ReactNode {
   if (typeof node === "string") {
     return translateText(node, language);
@@ -112,16 +124,41 @@ function translateReactNode(node: ReactNode, language: Language): ReactNode {
     if (primitiveOnly) {
       return translateText(node.map(String).join(""), language);
     }
-    // Mixed content (string + element): translate only the string slots, leave elements alone.
-    return node.map((child) =>
-      typeof child === "string" || typeof child === "number" ? translateReactNode(child, language) : child
+    return node.map((child) => translateReactNode(child, language));
+  }
+
+  if (!isValidElement(node)) {
+    return node;
+  }
+
+  const element = node as ReactElement<Record<string, unknown>>;
+
+  // Stop at React component boundaries — they own their subtree's translation.
+  if (typeof element.type !== "string") {
+    return node;
+  }
+
+  // Plain HTML element. Skip <code>/<pre> etc., otherwise translate string props
+  // and recurse into children (HTML wrapper depth is typically 1–3 levels).
+  if (SKIP_TRANSLATION_TAGS.has(element.type)) {
+    return node;
+  }
+
+  const nextProps: Record<string, unknown> = {};
+  for (const propName of ["placeholder", "aria-label", "title"]) {
+    const value = element.props[propName];
+    if (typeof value === "string") {
+      nextProps[propName] = translateText(value, language);
+    }
+  }
+
+  if ("children" in element.props) {
+    nextProps.children = Children.map(element.props.children as ReactNode, (child) =>
+      translateReactNode(child, language)
     );
   }
 
-  // React element or anything else: pass through. Recursion into element subtrees
-  // is intentionally skipped — it caused per-frame cloneElement over the whole
-  // tree and can break key stability in keyed lists.
-  return node;
+  return cloneElement(element, nextProps);
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
