@@ -279,11 +279,11 @@ Training 链路当前支持：
 - 验证 ThemeToggle 的暗色/亮色切换、路由侧边栏高亮、页面布局包裹和各页面入口是否正常。
 - 确认旧 DOM 级临时汉化链路不再恢复；当前多语言能力应保持在页面 / 组件级 i18n 或文案配置层，不翻译用户聊天内容、导入数据、JSON、代码块。
 
-#### P1：本机与 Docker 构建稳定性
+#### P1：本机与 Docker 构建稳定性（已解决）
 
-- 当前 `app/layout.tsx` 使用 `next/font/google` 加载 Geist / Geist Mono；本机网络无法访问 Google Fonts 时，`next build` 会失败。
-- 需要决定字体策略：继续使用 Google Fonts 并接受联网构建要求，或改为本地字体 / 系统字体，保证本机和 Docker 离线或弱网环境也能稳定构建。
-- 该项不应阻塞 P0 的代码修复，但会影响后续 exe 化、本机一键启动和 Docker 部署稳定性。
+- 历史问题：`app/layout.tsx` 曾使用 `next/font/google` 加载 Geist / Geist Mono；本机网络无法访问 Google Fonts 时，`next build` 会失败。
+- 2026-05-19 解决：改用 Vercel 官方 `geist` npm 包（内部走 `next/font/local`，字体 woff2 随包发布），构建期不再请求任何外部资源；本机离线、弱网、Docker 镜像构建链路都不再依赖 Google Fonts。
+- 字体级联：Geist 优先 → `Segoe UI` / `PingFang SC` / `Microsoft YaHei` / `system-ui` 系统 fallback，跨平台一致性保留。
 
 #### P1：新版 UI 可用性补齐
 
@@ -611,3 +611,14 @@ python scripts/run_mvp_regression.py
 - 本轮验证：本地 dev server 下 `/`、`/onboarding`、`/imports`、`/persona`、`/chat`、`/memories`、`/settings` 均返回 200，核心页面包含预期标题且未出现 Next error overlay。
 - 本轮确认：旧临时汉化链路未恢复，当前代码中未检出 `LanguageProvider`、`LocalizedContent`、`language-toggle` 或 `features/language/dictionary`。
 - 剩余 P1：当前阶段改为只做桌面网页端视觉验收；移动端导航与窄屏适配已暂停。内置浏览器连接在本轮检查时超时，因此浏览器内交互验收暂未完成。
+
+### 2026-05-19（追加）：重新引入 i18n + Asuka 背景 + 字体自托管
+
+- 本轮新增：`apps/web/features/i18n/{dictionary,language-provider}.tsx` —— 261 条 EN/中文字典 + 动态规则 + localStorage 持久化；`<html lang>` 随切换动态更新。
+- 本轮新增：`apps/web/components/language-toggle.tsx` —— topbar 上 NIGHT/DAY 风格的 EN/中文 切换。`LanguageProvider` 在 `app/layout.tsx` 包入 ThemeProvider 内层。
+- 本轮新增：亮色模式叠 `public/backgrounds/asuka-light.webp` 作为 body 背景；暗模式 `.dark body` 单独覆盖、不叠图，保持纯 NERV 终端观感。Surface token (`--surface`/`--surface-2`) 切为 rgba 半透明让卡片透出背景图。
+- 本轮性能修复：原 PNG 9.89 MB → WebP 0.15 MB（1920px 宽、q=78，缩减 98.4%）。原图移至 `apps/web/backgrounds-source/`，已 gitignore。
+- 本轮架构修复：用 `geist` 包替代 `next/font/google` 自托管字体，消除 Google Fonts 构建依赖（见上方 P1 解决说明）。
+- 本轮架构修复：`language-provider.translateReactNode` 改为**有界递归** —— 穿透 HTML 元素 (`<p>`/`<div>`/`<span>` 等) 继续翻译里面的字符串，但**在 React 组件边界停下**。这样 `<CardContent><p>No run yet.</p></CardContent>` 仍能翻译，但不会再每帧深度遍历整棵复杂组件子树（Memories debug 面板、Chat 等高密度页避免无谓重渲染开销 + 消除 keyed list 的 key 稳定性风险）。
+- 本轮验证：`npx tsc --noEmit` 通过；`next build` 通过，13 路由静态生成；dev server 2-3 秒启动；HTTP 烟测 `/`、`/chat`、`/memories` 全 200；`asuka-light.webp` 通过 HTTP 服务、161 KB；next/font `__variable_*` 哈希类名确认注入 `<html>`。
+- Reviewer 关注点：UI primitives (`Card`/`Badge`/`Button` 等) 仍标 `"use client"` 以便使用 `useI18n` hook。完全退回 server component 路线需要 ~100 处显式 `t(...)` 替换，本轮暂缓为后续重构候选。
