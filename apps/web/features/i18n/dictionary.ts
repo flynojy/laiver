@@ -24,6 +24,11 @@ export const translations: Record<string, Translation> = {
   DAY: { en: "DAY", zh: "日间" },
   "NERV TERMINAL · TOKYO-3": { en: "NERV TERMINAL · TOKYO-3", zh: "NERV 终端 · 第三新东京市" },
 
+  // Splash intro
+  "INITIATING NERV TERMINAL": { en: "INITIATING NERV TERMINAL", zh: "初始化 NERV 终端" },
+  "AT FIELD · ACTIVATED": { en: "AT FIELD · ACTIVATED", zh: "AT 力场 · 已激活" },
+  SKIP: { en: "SKIP", zh: "跳过" },
+
   "MISSION 00 / DASHBOARD": { en: "MISSION 00 / DASHBOARD", zh: "任务 00 / 总览" },
   "MAGI 一期验收终端": { en: "MAGI Phase-1 Validation Terminal", zh: "MAGI 一期验收终端" },
   "当前阶段只做一件事：把导入、Persona、Memory、Agent 主链路打磨扎实，并可稳定复现实验。": {
