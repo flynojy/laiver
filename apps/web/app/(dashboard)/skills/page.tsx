@@ -28,7 +28,7 @@ function InvocationList({ invocations }: { invocations: ReturnType<typeof toSkil
   return (
     <div className="space-y-3">
       {invocations.map((item) => (
-        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#fffdf9] p-4">
+        <div key={item.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface)] p-4">
           <div className="flex flex-wrap gap-2">
             {item.badges.map((badge) => (
               <Badge key={badge}>{badge}</Badge>
@@ -36,7 +36,7 @@ function InvocationList({ invocations }: { invocations: ReturnType<typeof toSkil
           </div>
           <p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.traceId}</p>
           <p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.timingLabel}</p>
-          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+          <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
             {item.outputJson}
           </pre>
           {item.error ? <p className="mt-2 text-xs text-[var(--danger)]">{item.error}</p> : null}
@@ -186,7 +186,7 @@ export default function SkillsPage() {
                 return (
                   <button
                     key={skill.id}
-                    className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] px-4 py-4 text-left"
+                    className="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] px-4 py-4 text-left"
                     onClick={() => setActiveSkillId(skill.id)}
                   >
                     <div className="flex flex-wrap items-center gap-2">
@@ -260,13 +260,13 @@ export default function SkillsPage() {
                   <div className="grid gap-4 xl:grid-cols-2">
                     <div>
                       <p className="mb-2 text-sm font-medium">Manifest</p>
-                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[var(--surface-2)] p-4 text-xs leading-6">
                         {activeSkillViewModel.manifestJson}
                       </pre>
                     </div>
                     <div>
                       <p className="mb-2 text-sm font-medium">Runtime Config</p>
-                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[#faf8f4] p-4 text-xs leading-6">
+                      <pre className="overflow-x-auto rounded-[1.5rem] bg-[var(--surface-2)] p-4 text-xs leading-6">
                         {activeSkillViewModel.runtimeConfigJson}
                       </pre>
                     </div>

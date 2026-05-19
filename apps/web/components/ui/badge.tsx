@@ -1,5 +1,8 @@
+"use client";
+
 import * as React from "react";
 
+import { useI18n } from "@/features/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 type BadgeVariant = "default" | "sync" | "standby" | "alert" | "idle";
@@ -9,6 +12,8 @@ type BadgeProps = React.HTMLAttributes<HTMLSpanElement> & {
 };
 
 export function Badge({ className, variant = "default", ...props }: BadgeProps) {
+  const { tNode } = useI18n();
+
   return (
     <span
       className={cn(
@@ -26,6 +31,8 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
         className
       )}
       {...props}
-    />
+    >
+      {tNode(props.children)}
+    </span>
   );
 }

@@ -1,5 +1,8 @@
+"use client";
+
 import * as React from "react";
 
+import { useI18n } from "@/features/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 type CardProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -30,6 +33,8 @@ export function CardTitle({
   className,
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
+  const { tNode } = useI18n();
+
   return (
     <h3
       className={cn(
@@ -37,7 +42,9 @@ export function CardTitle({
         className
       )}
       {...props}
-    />
+    >
+      {tNode(props.children)}
+    </h3>
   );
 }
 
@@ -45,11 +52,15 @@ export function CardDescription({
   className,
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
+  const { tNode } = useI18n();
+
   return (
     <p
       className={cn("text-xs leading-5 text-[var(--foreground-muted)]", className)}
       {...props}
-    />
+    >
+      {tNode(props.children)}
+    </p>
   );
 }
 
@@ -57,5 +68,11 @@ export function CardContent({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-6 pb-6", className)} {...props} />;
+  const { tNode } = useI18n();
+
+  return (
+    <div className={cn("px-6 pb-6", className)} {...props}>
+      {tNode(props.children)}
+    </div>
+  );
 }

@@ -24,3 +24,6 @@ apps/web/.env.local
 alembic.ini
 .tmp/test-runs/
 .tmp/fine-tuning/
+
+# Local-only image source files (do not ship to repo)
+apps/web/backgrounds-source/

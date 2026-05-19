@@ -1,3 +1,5 @@
+"use client";
+
 import { CheckCircle2, Database, MessageSquare, Sparkles } from "lucide-react";
 
 import { HexGrid } from "@/components/glyphs/HexGrid";
@@ -5,6 +7,7 @@ import { Mask02 } from "@/components/glyphs/Mask02";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useI18n } from "@/features/i18n/language-provider";
 
 const stages = [
   {
@@ -34,6 +37,8 @@ const stages = [
 ];
 
 export default function DashboardPage() {
+  const { t } = useI18n();
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -53,23 +58,23 @@ export default function DashboardPage() {
         </div>
         <div className="relative">
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--accent)]">
-            ▶ SYNCHRONIZATION COMPLETE
+            ▶ {t("SYNCHRONIZATION COMPLETE")}
           </p>
           <h2 className="mt-4 max-w-2xl text-2xl font-semibold leading-snug text-[var(--foreground)] md:text-3xl">
-            PERSONAL AGENT // MAGI v0.1
+            {t("PERSONAL AGENT // MAGI v0.1")}
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--foreground-muted)]">
-            All systems nominal. Verify import → persona → memory → agent loop before expanding mission scope.
+            {t("All systems nominal. Verify import → persona → memory → agent loop before expanding mission scope.")}
           </p>
           <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--foreground-muted)]">
             <span>
-              <span className="text-[var(--success)]">●</span> AT FIELD STABLE
+              <span className="text-[var(--success)]">●</span> {t("AT FIELD STABLE")}
             </span>
             <span>
-              <span className="text-[var(--success)]">●</span> MAGI ONLINE
+              <span className="text-[var(--success)]">●</span> {t("MAGI ONLINE")}
             </span>
             <span>
-              <span className="text-[var(--warning)]">●</span> SYNC RATIO 87.4%
+              <span className="text-[var(--warning)]">●</span> {t("SYNC RATIO 87.4%")}
             </span>
           </div>
         </div>
@@ -96,7 +101,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--foreground-muted)]">
-                      {item.tag}
+                      {t(item.tag)}
                     </p>
                     <CardTitle>{item.title}</CardTitle>
                   </div>

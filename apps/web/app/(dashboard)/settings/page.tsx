@@ -45,7 +45,7 @@ function ValidationBadge({ label, ok }: { label: string; ok: boolean }) {
 
 function RuntimeSummary({ runtime }: { runtime: LocalAdapterRuntimeViewModel }) {
   return (
-    <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 text-xs text-sky-900">
+    <div className="rounded-lg border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-3 text-xs text-[var(--foreground)]">
       <div className="flex flex-wrap gap-2">
         <Badge>{runtime.status}</Badge>
         {runtime.resident ? <Badge>resident</Badge> : <Badge>cold</Badge>}
@@ -65,7 +65,7 @@ function RuntimeSummary({ runtime }: { runtime: LocalAdapterRuntimeViewModel }) 
         </p>
       ) : null}
       {runtime.lastEvictionReason ? <p className="mt-1">last eviction: {runtime.lastEvictionReason}</p> : null}
-      {runtime.error ? <p className="mt-1 text-red-700">{runtime.error}</p> : null}
+      {runtime.error ? <p className="mt-1 text-[var(--danger)]">{runtime.error}</p> : null}
     </div>
   );
 }
@@ -231,7 +231,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {providerCards.map((provider) => (
-              <div key={provider.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[#faf8f4] p-4">
+              <div key={provider.id} className="rounded-[1.25rem] border border-[color:var(--border)] bg-[var(--surface-2)] p-4">
                 {provider.runtime ? (
                   <div className="mb-4">
                     <RuntimeSummary runtime={provider.runtime} />
@@ -305,7 +305,7 @@ export default function SettingsPage() {
                 <Label htmlFor="provider-type">Provider Type</Label>
                 <select
                   id="provider-type"
-                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-white px-3 text-sm"
+                  className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)]"
                   value={form.providerType}
                   onChange={(event) => setForm(buildProviderForm(event.target.value as ProviderFormType))}
                 >
@@ -417,18 +417,18 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <p className="font-medium text-[color:var(--foreground)]">Tool Calls</p>
-                      <pre className="mt-1 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 leading-6">
+                      <pre className="mt-1 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 leading-6">
                         {validation.toolCallsJson}
                       </pre>
                     </div>
                   </div>
                   {validation.errorLabel ? (
-                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <p className="rounded-2xl border border-[var(--warning)] bg-[color:var(--warning)]/10 px-3 py-2 text-xs text-[var(--warning)]">
                       {validation.errorLabel}
                     </p>
                   ) : null}
                   {validation.recommendation ? (
-                    <p className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                    <p className="rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-xs text-[var(--foreground)]">
                       {validation.recommendation}
                     </p>
                   ) : null}
@@ -443,7 +443,7 @@ export default function SettingsPage() {
           </Card>
 
           {activeProvider?.providerType === "local_adapter" && activeProvider.id ? (
-            <Card className="bg-white/88">
+            <Card className="bg-[var(--surface)]">
               <CardHeader>
                 <CardTitle>Resident Runtime</CardTitle>
                 <CardDescription>Keep the selected local adapter warm in memory so reply latency stays stable between turns.</CardDescription>

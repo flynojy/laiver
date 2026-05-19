@@ -1,11 +1,16 @@
+"use client";
+
 import * as React from "react";
 
+import { useI18n } from "@/features/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 export function Textarea({
   className,
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const { t, tNode } = useI18n();
+
   return (
     <textarea
       className={cn(
@@ -13,6 +18,11 @@ export function Textarea({
         className
       )}
       {...props}
-    />
+      aria-label={typeof props["aria-label"] === "string" ? t(props["aria-label"]) : props["aria-label"]}
+      placeholder={typeof props.placeholder === "string" ? t(props.placeholder) : props.placeholder}
+      title={typeof props.title === "string" ? t(props.title) : props.title}
+    >
+      {tNode(props.children)}
+    </textarea>
   );
 }

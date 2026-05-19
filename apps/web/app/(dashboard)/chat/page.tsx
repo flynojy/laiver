@@ -210,7 +210,7 @@ export default function ChatPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Model Provider</label>
               <select
-                className="w-full rounded-2xl border border-[color:var(--border)] bg-white px-4 py-3 text-sm"
+                className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--foreground)]"
                 value={selectedProviderId}
                 onChange={(event) => setSelectedProviderId(event.target.value as UUID | "")}
               >
@@ -438,7 +438,7 @@ export default function ChatPage() {
                     <Badge>{lastRun.compression.recentMessageCount} recent kept</Badge>
                   </div>
                   {lastRun.compression.summary ? (
-                    <pre className="overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+                    <pre className="overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
                       {lastRun.compression.summary}
                     </pre>
                   ) : (
@@ -495,7 +495,7 @@ export default function ChatPage() {
                 lastRun.explanation.skillOutputsUsed.length > 0 ? (
                   <div className="space-y-2">
                     {lastRun.explanation.skillOutputsUsed.map((item) => (
-                      <div key={item} className="rounded-2xl bg-[#faf8f4] p-3 text-sm leading-6">
+                      <div key={item} className="rounded-2xl bg-[var(--surface-2)] p-3 text-sm leading-6">
                         {item}
                       </div>
                     ))}
@@ -514,13 +514,13 @@ export default function ChatPage() {
                 lastRun.skillInvocations.length > 0 ? (
                   <div className="space-y-3">
                     {lastRun.skillInvocations.map((invocation) => (
-                      <div key={invocation.id} className="rounded-2xl border border-[color:var(--border)] bg-[#fffdf9] p-3">
+                      <div key={invocation.id} className="rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] p-3">
                         <div className="flex flex-wrap gap-2">
                           <Badge>{invocation.skillSlug}</Badge>
                           <Badge>{invocation.toolName}</Badge>
                           <Badge>{invocation.status}</Badge>
                         </div>
-                        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#faf8f4] p-3 text-xs leading-6">
+                        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-6">
                           {invocation.outputJson}
                         </pre>
                         {invocation.error ? (

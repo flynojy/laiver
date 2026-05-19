@@ -261,10 +261,47 @@ Training 链路当前支持：
 
 ## 5. 已知问题与任务池
 
+### 当前优先级（2026-05-19 UI 更新后）
+
+本轮 Claude UI 更新已经移除上一版临时汉化链路，当前优先级应先回到“可运行、可构建、可验证”的工程基线，再继续做视觉和体验 polish。
+
+#### P0：恢复 Web 验证基线
+
+- 修复 `apps/web/features/providers/view-models.ts` 的编码损坏与未闭合字符串问题；当前 `npm.cmd run typecheck:web` 会在该文件第 81、88、95 行附近失败。
+- 修复后立即重跑 `npm.cmd run typecheck:web`，确认 Settings/provider feature mapper 能被正常导入。
+- 重跑 `npm.cmd run build:web`，确认新 UI 在生产构建路径下可用。
+- 若构建仍失败，优先区分“代码错误”和“网络/字体下载错误”，不要把两类问题混在一起判断。
+
+#### P0：确认新版 UI 主链路没有回归
+
+- 跑通 `/`、`/onboarding`、`/imports`、`/persona`、`/chat`、`/memories`、`/settings` 这些核心页面的加载。
+- 重点验证 Settings 页，因为它依赖当前损坏的 provider preset view model。
+- 验证 ThemeToggle 的暗色/亮色切换、路由侧边栏高亮、页面布局包裹和各页面入口是否正常。
+- 确认旧 DOM 级临时汉化链路不再恢复；当前多语言能力应保持在页面 / 组件级 i18n 或文案配置层，不翻译用户聊天内容、导入数据、JSON、代码块。
+
+#### P1：本机与 Docker 构建稳定性
+
+- 当前 `app/layout.tsx` 使用 `next/font/google` 加载 Geist / Geist Mono；本机网络无法访问 Google Fonts 时，`next build` 会失败。
+- 需要决定字体策略：继续使用 Google Fonts 并接受联网构建要求，或改为本地字体 / 系统字体，保证本机和 Docker 离线或弱网环境也能稳定构建。
+- 该项不应阻塞 P0 的代码修复，但会影响后续 exe 化、本机一键启动和 Docker 部署稳定性。
+
+#### P1：新版 UI 可用性补齐
+
+- 当前阶段只面向桌面网页端优化；移动端导航与窄屏适配暂停，不作为近期任务。
+- 后续 UI 文案以中文界面为主，允许出现的语种仅限中文、英文和日文；新增功能默认先写自然中文，英文/日文只用于品牌、模型名、专有名词、文件格式、接口名或必要的风格化点缀。
+- 检查 EVA 风格状态文本、图标符号、中文页面文案在 Windows 终端显示乱码和浏览器真实渲染之间的差异，避免误判文件编码。
+- 对新版 UI 做一次桌面网页端截图验收，重点看文字溢出、按钮可点击区域、卡片密度和暗色/亮色对比度。
+
+#### P2：后续产品体验 polish
+
+- 在构建基线恢复后，再继续处理 Onboarding、Chat、Memory、Settings 的用户态解释和空状态。
+- 新 UI 可以保留强风格化方向，但仍应优先服务实际操作流，不能变成营销 landing page。
+- 后续如果重新做多语言，不建议恢复 DOM 级全文替换方案，应改为页面/组件级 i18n 或文案配置层。
+
 ### P0：验证基线
 
 - 后端 lint 和 integration suite 已可在 `.venv` 中通过。
-- 前端 TypeScript `baseUrl` 弃用检查已通过移除 `baseUrl` 处理；Node 22 下 `npm ci`、`npm run typecheck:web`、`npm run build:web` 已通过。
+- 前端 TypeScript `baseUrl` 弃用检查已通过移除 `baseUrl` 处理；历史记录中 Node 22 下 `npm ci`、`npm run typecheck:web`、`npm run build:web` 曾通过。2026-05-19 UI 更新后，当前 Web 基线需要重新恢复，优先见上方“当前优先级”。
 - Windows 本机链路优先使用 `.venv\Scripts\python.exe`，避免依赖全局 Python。
 - 本机全局 Node 可能不是 22；`scripts/windows/Start-AgentLocal.ps1` 会优先解析 `.tmp\tools` 下的 Node 22 便携版。
 - 需要补充一条本机启动脚本的自动化验证，至少覆盖脚本语法、缺依赖提示、端口占用提示、API/Web health check。
@@ -564,3 +601,13 @@ python scripts/run_mvp_regression.py
 - Completed: mapper type imports for Imports, Training, Persona, and Onboarding now reference feature clients rather than `@/lib/api`, keeping DTO knowledge inside feature boundaries.
 - Verification: `npm.cmd run typecheck:web` and `npm.cmd run build:web` both passed.
 - Next: gradually move endpoint implementations from `apps/web/lib/api.ts` into each feature client, then shrink `lib/api.ts` to transport plus truly shared DTO helpers.
+
+### 2026-05-19: restore Web P0 baseline after Claude UI update
+
+- 本轮修复：恢复 `apps/web/features/providers/view-models.ts` 为合法 UTF-8，并修复 provider preset helper 字符串未闭合问题；Settings/provider feature mapper 可再次被正常导入。
+- 本轮修复：移除 `app/layout.tsx` 对 `next/font/google` 的运行时依赖，改由 `globals.css` 提供本机系统字体变量，避免本机或 Docker 弱网环境下 `next build` 因 Google Fonts 下载超时失败。
+- 本轮验证：`npm.cmd run typecheck:web` 通过。
+- 本轮验证：`npm.cmd run build:web` 通过，13 个 App Router 页面均完成静态生成。
+- 本轮验证：本地 dev server 下 `/`、`/onboarding`、`/imports`、`/persona`、`/chat`、`/memories`、`/settings` 均返回 200，核心页面包含预期标题且未出现 Next error overlay。
+- 本轮确认：旧临时汉化链路未恢复，当前代码中未检出 `LanguageProvider`、`LocalizedContent`、`language-toggle` 或 `features/language/dictionary`。
+- 剩余 P1：当前阶段改为只做桌面网页端视觉验收；移动端导航与窄屏适配已暂停。内置浏览器连接在本轮检查时超时，因此浏览器内交互验收暂未完成。

@@ -1,5 +1,8 @@
+"use client";
+
 import * as React from "react";
 
+import { useI18n } from "@/features/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 export function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
@@ -10,6 +13,8 @@ export function TableHead({
   className,
   ...props
 }: React.ThHTMLAttributes<HTMLTableCellElement>) {
+  const { tNode } = useI18n();
+
   return (
     <th
       className={cn(
@@ -17,7 +22,9 @@ export function TableHead({
         className
       )}
       {...props}
-    />
+    >
+      {tNode(props.children)}
+    </th>
   );
 }
 
