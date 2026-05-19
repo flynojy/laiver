@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/features/i18n/language-provider";
+import { SplashGate } from "@/features/splash/SplashGate";
 
 const stages = [
   {
@@ -114,6 +115,9 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* NERV terminal boot sequence — plays on every mount of the Dashboard route */}
+      <SplashGate />
     </div>
   );
 }
