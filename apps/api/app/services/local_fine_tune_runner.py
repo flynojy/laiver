@@ -189,7 +189,15 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
     peft = _load_module("peft")
 
     if plan["backend"] == "local_qlora" and platform.system() == "Windows":
-        raise RuntimeError("QLoRA training currently requires a Linux or WSL environment with bitsandbytes support.")
+        # bitsandbytes ships official Windows wheels from 0.45 onward and works on
+        # Blackwell (sm_120) with CUDA 12.8 wheels. Allow Windows QLoRA only when
+        # the import succeeds; otherwise keep a helpful guard that points the user
+        # at either installing bitsandbytes or switching to backend=local_lora.
+        if importlib.util.find_spec("bitsandbytes") is None:
+            raise RuntimeError(
+                "QLoRA training on Windows requires bitsandbytes. Install bitsandbytes (Windows "
+                "wheels are supported from 0.45 onward) or switch the job backend to local_lora."
+            )
 
     hyperparameters = plan["hyperparameters"]
     base_model = plan["base_model"]
@@ -197,10 +205,16 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
     output_dir = Path(config["output_dir"])
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    # Track whether we actually had to add a brand-new pad token; only then is the
+    # embedding genuinely larger than the base model's input embedding and a
+    # `resize_token_embeddings` call is needed. Reusing an existing eos/unk token
+    # as pad must NOT trigger a resize.
+    pad_token_added = False
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     if tokenizer.pad_token is None:
         tokenizer.add_special_tokens({"pad_token": "<pad>"})
+        pad_token_added = True
 
     load_kwargs: dict[str, Any] = {"trust_remote_code": True}
     if torch.cuda.is_available():
@@ -219,7 +233,14 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
         load_kwargs["quantization_config"] = bitsandbytes_config
 
     model = transformers.AutoModelForCausalLM.from_pretrained(base_model, **load_kwargs)
-    if tokenizer.vocab_size != model.get_input_embeddings().weight.shape[0]:
+    # IMPORTANT: only resize when we actually added a new special token above.
+    # `tokenizer.vocab_size` returns the base SentencePiece vocab (often smaller
+    # than `model.embed_tokens.shape[0]`, which already includes slots reserved
+    # by the model author for special tokens). Resizing on the bare inequality
+    # would shrink the embedding to the SPM size and corrupt the model — and
+    # later adapter inference would fail with a size_mismatch error when the
+    # base model is reloaded at full size during warm-up.
+    if pad_token_added and len(tokenizer) > model.get_input_embeddings().weight.shape[0]:
         model.resize_token_embeddings(len(tokenizer))
 
     if plan["backend"] == "local_qlora" and hasattr(peft, "prepare_model_for_kbit_training"):
@@ -263,9 +284,15 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
         def __getitem__(self, index: int) -> dict[str, list[int]]:
             return self.rows[index]
 
+    # transformers 4.46+ renamed `evaluation_strategy` → `eval_strategy`
+    # transformers 5.0 dropped `overwrite_output_dir` (default behavior is overwrite anyway)
+    # Skip mid-training checkpoint saves: we only need the final adapter, and
+    # safetensors serialization of peft-on-bnb-4bit currently fails on Windows
+    # (safetensors `_tobytes` MemoryError on quantized-derived tensors). The
+    # final `model.save_pretrained` below uses pytorch .bin format for the same
+    # reason.
     training_args = transformers.TrainingArguments(
         output_dir=output_dir.as_posix(),
-        overwrite_output_dir=True,
         num_train_epochs=float(hyperparameters["num_train_epochs"]),
         per_device_train_batch_size=int(hyperparameters["per_device_train_batch_size"]),
         per_device_eval_batch_size=int(hyperparameters["per_device_eval_batch_size"]),
@@ -273,9 +300,8 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
         learning_rate=float(hyperparameters["learning_rate"]),
         warmup_ratio=float(hyperparameters["warmup_ratio"]),
         logging_steps=int(hyperparameters["logging_steps"]),
-        evaluation_strategy="epoch" if validation_dataset else "no",
-        save_strategy="epoch",
-        save_total_limit=1,
+        eval_strategy="epoch" if validation_dataset else "no",
+        save_strategy="no",
         report_to=[],
         remove_unused_columns=False,
         fp16=torch.cuda.is_available() and not _supports_bfloat16(torch),
@@ -296,7 +322,10 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
 
     artifact_dir = output_dir / "final_adapter"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(artifact_dir.as_posix())
+    # `safe_serialization=False` writes adapter_model.bin instead of safetensors,
+    # avoiding the safetensors `_tobytes` MemoryError observed on Windows when
+    # peft saves an adapter attached to a bnb-4bit-quantized base.
+    model.save_pretrained(artifact_dir.as_posix(), safe_serialization=False)
     tokenizer.save_pretrained(artifact_dir.as_posix())
 
     result = {
