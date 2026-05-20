@@ -205,10 +205,16 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
     output_dir = Path(config["output_dir"])
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    # Track whether we actually had to add a brand-new pad token; only then is the
+    # embedding genuinely larger than the base model's input embedding and a
+    # `resize_token_embeddings` call is needed. Reusing an existing eos/unk token
+    # as pad must NOT trigger a resize.
+    pad_token_added = False
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     if tokenizer.pad_token is None:
         tokenizer.add_special_tokens({"pad_token": "<pad>"})
+        pad_token_added = True
 
     load_kwargs: dict[str, Any] = {"trust_remote_code": True}
     if torch.cuda.is_available():
@@ -227,7 +233,14 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
         load_kwargs["quantization_config"] = bitsandbytes_config
 
     model = transformers.AutoModelForCausalLM.from_pretrained(base_model, **load_kwargs)
-    if tokenizer.vocab_size != model.get_input_embeddings().weight.shape[0]:
+    # IMPORTANT: only resize when we actually added a new special token above.
+    # `tokenizer.vocab_size` returns the base SentencePiece vocab (often smaller
+    # than `model.embed_tokens.shape[0]`, which already includes slots reserved
+    # by the model author for special tokens). Resizing on the bare inequality
+    # would shrink the embedding to the SPM size and corrupt the model — and
+    # later adapter inference would fail with a size_mismatch error when the
+    # base model is reloaded at full size during warm-up.
+    if pad_token_added and len(tokenizer) > model.get_input_embeddings().weight.shape[0]:
         model.resize_token_embeddings(len(tokenizer))
 
     if plan["backend"] == "local_qlora" and hasattr(peft, "prepare_model_for_kbit_training"):
