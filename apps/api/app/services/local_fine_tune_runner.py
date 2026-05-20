@@ -189,7 +189,15 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
     peft = _load_module("peft")
 
     if plan["backend"] == "local_qlora" and platform.system() == "Windows":
-        raise RuntimeError("QLoRA training currently requires a Linux or WSL environment with bitsandbytes support.")
+        # bitsandbytes ships official Windows wheels from 0.45 onward and works on
+        # Blackwell (sm_120) with CUDA 12.8 wheels. Allow Windows QLoRA only when
+        # the import succeeds; otherwise keep a helpful guard that points the user
+        # at either installing bitsandbytes or switching to backend=local_lora.
+        if importlib.util.find_spec("bitsandbytes") is None:
+            raise RuntimeError(
+                "QLoRA training on Windows requires bitsandbytes. Install bitsandbytes (Windows "
+                "wheels are supported from 0.45 onward) or switch the job backend to local_lora."
+            )
 
     hyperparameters = plan["hyperparameters"]
     base_model = plan["base_model"]
@@ -263,9 +271,15 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
         def __getitem__(self, index: int) -> dict[str, list[int]]:
             return self.rows[index]
 
+    # transformers 4.46+ renamed `evaluation_strategy` → `eval_strategy`
+    # transformers 5.0 dropped `overwrite_output_dir` (default behavior is overwrite anyway)
+    # Skip mid-training checkpoint saves: we only need the final adapter, and
+    # safetensors serialization of peft-on-bnb-4bit currently fails on Windows
+    # (safetensors `_tobytes` MemoryError on quantized-derived tensors). The
+    # final `model.save_pretrained` below uses pytorch .bin format for the same
+    # reason.
     training_args = transformers.TrainingArguments(
         output_dir=output_dir.as_posix(),
-        overwrite_output_dir=True,
         num_train_epochs=float(hyperparameters["num_train_epochs"]),
         per_device_train_batch_size=int(hyperparameters["per_device_train_batch_size"]),
         per_device_eval_batch_size=int(hyperparameters["per_device_eval_batch_size"]),
@@ -273,9 +287,8 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
         learning_rate=float(hyperparameters["learning_rate"]),
         warmup_ratio=float(hyperparameters["warmup_ratio"]),
         logging_steps=int(hyperparameters["logging_steps"]),
-        evaluation_strategy="epoch" if validation_dataset else "no",
-        save_strategy="epoch",
-        save_total_limit=1,
+        eval_strategy="epoch" if validation_dataset else "no",
+        save_strategy="no",
         report_to=[],
         remove_unused_columns=False,
         fp16=torch.cuda.is_available() and not _supports_bfloat16(torch),
@@ -296,7 +309,10 @@ def _run_transformers_training(config: dict[str, Any], plan: dict[str, Any]) -> 
 
     artifact_dir = output_dir / "final_adapter"
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(artifact_dir.as_posix())
+    # `safe_serialization=False` writes adapter_model.bin instead of safetensors,
+    # avoiding the safetensors `_tobytes` MemoryError observed on Windows when
+    # peft saves an adapter attached to a bnb-4bit-quantized base.
+    model.save_pretrained(artifact_dir.as_posix(), safe_serialization=False)
     tokenizer.save_pretrained(artifact_dir.as_posix())
 
     result = {
