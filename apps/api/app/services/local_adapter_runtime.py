@@ -250,19 +250,53 @@ class LocalAdapterRuntimeManager:
             tokenizer.add_special_tokens({"pad_token": "<pad>"})
 
         load_kwargs: dict[str, Any] = {"trust_remote_code": True}
+        compute_dtype = torch.float32
         if torch.cuda.is_available():
             if hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
-                load_kwargs["torch_dtype"] = torch.bfloat16
+                compute_dtype = torch.bfloat16
             else:
-                load_kwargs["torch_dtype"] = torch.float16
-        else:
-            load_kwargs["torch_dtype"] = torch.float32
+                compute_dtype = torch.float16
+        load_kwargs["torch_dtype"] = compute_dtype
+
+        # Heuristic: load the base in 4-bit when it is too large to fit in
+        # VRAM at the compute dtype. Estimate parameter count from the model
+        # name suffix (`-14B`, `-32B`, `-70B`, etc.).
+        #
+        # 4-bit base inference is the *only* way to fit a 14 B Qwen3 LoRA into
+        # a 16 GB consumer GPU. Without this the loader silently consumes 28
+        # GB and Windows pages weights to system RAM, which breaks generation
+        # latency and risks OOM crashes.
+        want_4bit = False
+        if torch.cuda.is_available():
+            import re
+
+            size_match = re.search(r"(\d+(?:\.\d+)?)\s*[bB]\b", entry.base_model)
+            if size_match:
+                try:
+                    params_b = float(size_match.group(1))
+                except ValueError:
+                    params_b = 0.0
+                if params_b >= 7.5:
+                    want_4bit = True
+
+        if want_4bit and importlib.util.find_spec("bitsandbytes") is not None:
+            load_kwargs["quantization_config"] = transformers.BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=compute_dtype,
+            )
+            # device_map="auto" lets accelerate place the quantized shards across
+            # available devices without a manual .to("cuda") call afterwards
+            # (which would actually fail on quantized layers).
+            load_kwargs["device_map"] = "auto"
 
         base_model = transformers.AutoModelForCausalLM.from_pretrained(entry.base_model, **load_kwargs)
-        if torch.cuda.is_available():
+        if not load_kwargs.get("quantization_config") and torch.cuda.is_available():
+            # Non-quantized path: move the bf16/fp16 weights to CUDA explicitly.
             base_model = base_model.to("cuda")
         model = peft.PeftModel.from_pretrained(base_model, adapter_dir.as_posix())
-        if torch.cuda.is_available():
+        if not load_kwargs.get("quantization_config") and torch.cuda.is_available():
             model = model.to("cuda")
         model.eval()
 
